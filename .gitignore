@@ -94,3 +94,7 @@ schema.sql
 analysis_reports/
 
 02NC4315.py
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
