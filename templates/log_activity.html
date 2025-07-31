@@ -1,0 +1,109 @@
+<!-- templates/log_activity.html -->
+{% extends "base_layout.html" %}
+
+{% block title %}Log Activity{% endblock %}
+{% block page_title %}Log Sales Call / Visit{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Log New Activity</h5>
+
+                <!-- Display Success/Error Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+
+                <form action="{{ url_for('main.log_activity_submit') }}" method="POST">
+                    {{ form.hidden_tag() }} <!-- Include CSRF token -->
+
+                    <!-- Account Selection -->
+                    <div class="mb-3">
+                        <label for="account_card_code" class="form-label">{{ form.account_card_code.label }}</label>
+                        <!-- Use Select2 for searchable dropdown if many accounts -->
+                        {{ form.account_card_code(class="form-select form-select-sm", id="account_card_code", required=True) }}
+                         {% if form.account_card_code.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.account_card_code.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">Select the account contacted.</small>
+                    </div>
+
+                    <!-- Activity Type -->
+                    <div class="mb-3">
+                        <label for="activity_type" class="form-label">{{ form.activity_type.label }}</label>
+                        {{ form.activity_type(class="form-select form-select-sm", id="activity_type", required=True) }}
+                         {% if form.activity_type.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.activity_type.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                     <!-- Activity Date/Time (Optional - Default to Now) -->
+                     <div class="mb-3">
+                        <label for="activity_datetime" class="form-label">{{ form.activity_datetime.label }}</label>
+                        {{ form.activity_datetime(class="form-control form-control-sm", id="activity_datetime", type="datetime-local") }}
+                        {% if form.activity_datetime.errors %}
+                             <div class="invalid-feedback d-block">
+                                {% for error in form.activity_datetime.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">Defaults to now if left blank.</small>
+                    </div>
+
+                    <!-- Outcome (Optional) -->
+                    <div class="mb-3">
+                         <label for="outcome" class="form-label">{{ form.outcome.label }}</label>
+                         {{ form.outcome(class="form-select form-select-sm", id="outcome") }}
+                         {% if form.outcome.errors %}
+                             <div class="invalid-feedback d-block">{% for error in form.outcome.errors %}{{ error }}{% endfor %}</div>
+                         {% endif %}
+                    </div>
+
+                    <!-- Notes (Optional) -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">{{ form.notes.label }}</label>
+                        {{ form.notes(class="form-control form-control-sm", id="notes", rows="3") }}
+                         {% if form.notes.errors %}
+                             <div class="invalid-feedback d-block">{% for error in form.notes.errors %}{{ error }}{% endfor %}</div>
+                         {% endif %}
+                         <small class="form-text text-muted">Add any relevant details about the call/visit.</small>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Log Activity</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Select2 JS/CSS if you use it -->
+<!-- <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" /> -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script> -->
+<!-- <script> -->
+<!--  $(document).ready(function() { -->
+<!--      $('#account_card_code').select2({ theme: "bootstrap-5" }); -->
+<!--  }); -->
+<!-- </script> -->
+
+{% endblock %}
+
+{% block scripts %}
+ {{ super() }}
+ <!-- Add Select2 initialization here if used -->
+{% endblock %}

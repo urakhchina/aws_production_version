@@ -1,0 +1,352 @@
+{% extends "base_layout.html" %}
+
+{% block title %}Strategic Command Center{% endblock %}
+
+{% block page_title %}Strategic Command Center{% endblock %}
+
+{% block head_css %}
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <!-- Your Custom Dashboard CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <style>
+        /* Styles moved from previous response, potentially merge into dashboard.css */
+
+        /* --- Action Hub Table --- */
+        #accountActionTable { font-size: 0.9rem; }
+        #accountActionTable thead th { background-color: #e9ecef; white-space: nowrap; vertical-align: middle; } /* Added vertical-align */
+        #accountActionTable .priority-score-cell { font-weight: bold; text-align: center; }
+        #accountActionTable .reason-cell { text-align: center; font-size: 1.1em; white-space: nowrap; } /* Added nowrap for icons */
+        #accountActionTable .reason-cell .reason-icon { margin: 0 2px; cursor: default; }
+        #accountActionTable tbody tr { cursor: pointer; }
+        #accountActionTable tbody tr:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.05) !important; /* Use Bootstrap primary color with opacity */
+            --bs-table-accent-bg: rgba(var(--bs-primary-rgb), 0.05) !important; /* Ensure BS5 hover variable is set */
+        }
+        #accountActionTable .dataTables_wrapper .row:first-child { padding-top: 0.5rem; }
+        #accountActionTable .dataTables_wrapper .row:last-child { padding-bottom: 0.5rem; }
+        #accountActionTable td, #accountActionTable th { vertical-align: middle; }
+
+        /* --- Quick Filters --- */
+        .quick-filters { padding-bottom: 0.5rem; }
+        .quick-filters .btn { margin-right: 5px; margin-bottom: 5px; font-size: 0.8rem; padding: 0.25rem 0.6rem; border-radius: 1rem; /* Pill shape */ }
+        .quick-filters .btn i { margin-right: 4px; }
+        .quick-filters .btn.active {
+            font-weight: 600; /* Make active bolder */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            /* Colors set dynamically by JS */
+        }
+        .quick-filters .btn:disabled, .quick-filters .btn.disabled {
+             cursor: not-allowed;
+             opacity: 0.65;
+        }
+
+
+        /* --- Snapshot/KPI Cards --- */
+        .kpi-card-sm { padding: 0.8rem; text-align: center; border-radius: 6px; background-color: #fff; border: 1px solid #dee2e6; /* Use Bootstrap's default border color */ box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .kpi-card-sm:hover { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(0,0,0,0.06); }
+        .kpi-card-sm .kpi-label { font-size: 0.75rem; color: #6c757d; text-transform: uppercase; margin-bottom: 0.2rem; font-weight: 500; }
+        .kpi-card-sm .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.1; margin-bottom: 0; }
+        .kpi-card-sm .kpi-value a { text-decoration: none; color: inherit; }
+        .kpi-card-sm .kpi-value a:hover { color: var(--bs-primary); } /* Use Bootstrap primary */
+        .kpi-card-sm i { margin-right: 3px; }
+
+        /* Doughnut Chart Containers */
+        .chart-container-sm { height: 180px; /* Adjust as needed */ position: relative; }
+         /* Ensure canvas fits container */
+        .chart-container-sm canvas { max-width: 100%; max-height: 100%; }
+
+
+        /* Loading/No Data Indicators */
+        #tableLoadingIndicator, #tableNoDataIndicator {
+            position: absolute; /* Position within the table wrapper */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 80%;
+            padding: 2rem;
+            background-color: rgba(255, 255, 255, 0.85); /* Slightly more opaque */
+            border-radius: 8px;
+            z-index: 10;
+             display: none; /* Hide initially, controlled by JS */
+             flex-direction: column; /* Stack icon and text */
+             align-items: center;
+             justify-content: center;
+        }
+        #tableNoDataIndicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        z-index: 100; /* Ensure this is appropriate for your layout */
+        display: none; /* Hidden by default */
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+        /* Make table wrapper relative for absolute positioning of indicators */
+        .dataTables_wrapper { position: relative; min-height: 200px; /* Give space for indicators */ }
+
+        /* Notification Area Styling */
+        #notification-area .alert {
+            min-width: 250px; /* Ensure notifications aren't too narrow */
+        }
+
+        /* Optional: Green Hue Theme Variables (Example) */
+        /* Define these if you want to override Bootstrap defaults or use them elsewhere */
+        /* :root {
+            --primary-green: #198754;
+            --primary-green-rgb: 25, 135, 84;
+            --light-green: #d1e7dd;
+            --dark-green: #0f5132;
+        } */
+
+    </style>
+{% endblock %}
+
+{% block content %}
+    <!-- Data container for JS initialization -->
+    <div id="initial-data"
+        data-initial-sales-rep-id='{{ initial_sales_rep_id | default(none) | tojson }}'
+        style="display:none;"
+        aria-hidden="true"></div>
+
+    <!-- 1. Daily Briefing / Snapshot Row -->
+    <div class="row g-2 mb-4"> <!-- Use smaller gutters -->
+        <!-- KPI Cards -->
+        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2"> <!-- Adjusted grid for better spacing -->
+            <div class="kpi-card-sm h-100">
+                <div class="kpi-label"><i class="fas fa-users text-secondary"></i> Total Accounts</div>
+                <div id="kpiTotalAccounts" class="kpi-value text-secondary">-</div>
+            </div>
+        </div>
+        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2">
+            <div class="kpi-card-sm h-100">
+                <div class="kpi-label"><i class="fas fa-dollar-sign text-success"></i> Portfolio YEP</div>
+                <div id="kpiTotalValue" class="kpi-value text-success">-</div>
+            </div>
+        </div>
+        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2">
+            <div class="kpi-card-sm h-100">
+                <div class="kpi-label"><i class="fas fa-tachometer-alt text-info"></i> Avg. Priority Score</div>
+                <div id="kpiAvgPriority" class="kpi-value text-info">-</div>
+            </div>
+        </div>
+        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2">
+            <div class="kpi-card-sm h-100">
+                <div class="kpi-label"><i class="fas fa-heartbeat text-primary"></i> Avg. Health Score</div>
+                <div id="kpiAvgHealth" class="kpi-value text-primary">-</div>
+            </div>
+        </div>
+
+        <!-- Quick Filters (Row 2 of Snapshot) -->
+        <div class="col-12 mt-2 d-flex flex-wrap justify-content-center justify-content-lg-start quick-filters">
+            <button type="button" class="btn btn-sm btn-outline-danger quick-filter-btn" data-filter="priority1">
+                <i class="fas fa-fire"></i> Priority 1 (<span id="countPriority1">0</span>)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-warning quick-filter-btn" data-filter="priority2">
+                <i class="fas fa-exclamation-triangle"></i> Priority 2 (<span id="countPriority2">0</span>)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-info quick-filter-btn" data-filter="due_this_week">
+                <i class="fas fa-calendar-week"></i> Due This Week (<span id="countDueThisWeek">0</span>)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger quick-filter-btn" data-filter="overdue">
+                <i class="fas fa-calendar-times"></i> Overdue (<span id="countOverdue">0</span>)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger quick-filter-btn" data-filter="low_health">
+                <i class="fas fa-heart-broken"></i> Low Health (<span id="countLowHealth">0</span>)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger quick-filter-btn" data-filter="low_pace">
+                 <i class="fas fa-angle-double-down"></i> Pace Decline (<span id="countLowPace">0</span>)
+             </button>
+            <button type="button" class="btn btn-sm btn-outline-success quick-filter-btn" data-filter="high_pace">
+                <i class="fas fa-angle-double-up"></i> Strong Pace (<span id="countHighPace">0</span>)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success quick-filter-btn" data-filter="growth_opps">
+                <i class="fas fa-seedling"></i> Growth Opps (<span id="countGrowthOpps">0</span>)
+            </button>
+             <button type="button" class="btn btn-sm btn-outline-secondary quick-filter-btn active" data-filter="all"> <!-- Default Active -->
+                <i class="fas fa-list"></i> View All (<span id="countAll">0</span>)
+             </button>
+        </div>
+    </div>
+
+    <!-- Main Content Row: Action Hub Table (now full width) -->
+    <div class="row g-4">
+        <!-- Action Hub Column (now full width) -->
+        <div class="col-12">
+            <div class="card shadow-sm"> <!-- Added slight shadow -->
+                <div class="card-header bg-light d-flex justify-content-between align-items-center py-2 flex-wrap"> <!-- Lighter header, Added flex-wrap -->
+                    <h5 class="mb-1 mb-md-0 h6 me-3 text-secondary">Account Action List</h5>
+                    <!-- Standard Filters -->
+                    <div class="d-flex align-items-center flex-grow-1 flex-wrap justify-content-md-end"> <!-- Added flex-wrap, justify on medium+ -->
+                       <!-- Sales Rep Dropdown -->
+                       <div class="me-2 mb-1 mb-md-0"> <!-- Margin adjustments -->
+                           <label for="strategicSalesRepFilter" class="visually-hidden">Sales Rep</label> <!-- For accessibility -->
+                           <select id="strategicSalesRepFilter" class="form-select form-select-sm" style="max-width: 180px;">
+                               <option value="">-- Select a Rep --</option>
+                               <!-- Populated by JS -->
+                           </select>
+                       </div>
+                       <!-- Distributor Dropdown -->
+                       <div class="me-2 mb-1 mb-md-0"> <!-- Margin adjustments -->
+                          <label for="distributorFilter" class="visually-hidden">Distributor</label> <!-- For accessibility -->
+                           <select id="distributorFilter" class="form-select form-select-sm" style="max-width: 180px;">
+                               <option value="">All Distributors</option>
+                               <!-- Populated by JS -->
+                           </select>
+                       </div>
+                        <!-- Apply button -->
+                        <div class="mb-1 mb-md-0">
+                             <button id="applyMainFilters" class="btn btn-primary btn-sm">
+                               <i class="fas fa-sync-alt"></i> <span class="d-none d-md-inline">Reload</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body pt-2">
+                    <!-- Action Hub Table -->
+                    <div class="table-responsive">
+                        <table id="accountActionTable" class="table table-hover table-sm" style="width:100%">
+                             <thead>
+                                 <tr>
+                                     <!-- Key Columns - CORRECTED ORDER -->
+                                     <th>Account Name</th>
+                                     <th class="text-center" title="Action Priority Score (Higher = More Urgent)">Priority</th>
+                                     <th class="text-center" title="Key Reason(s) for Priority">Reason(s)</th> <!-- Moved Up -->
+                                     <th title="Next Expected Purchase Date / Overdue Days">Due / Overdue</th>
+                                     <th class="text-center" title="Health Score (0-100)">Health</th> <!-- Moved Down -->
+                                     <th class="text-end" title="Projected Pacing vs Last Year %">Pace %</th>
+                                     <th class="text-end" title="Estimated Year End Pace Revenue">YEP</th>
+                                     <th>RFM</th>
+                                     <!-- Hidden by default / Less critical -->
+                                     <th class="d-none d-xl-table-cell text-end">Coverage %</th>
+                                     <th class="d-none d-xxl-table-cell text-end">Last Order</th>
+                                 </tr>
+                             </thead>
+                            <tbody>
+                                <!-- Populated by DataTables via JS -->
+                            </tbody>
+                        </table>
+                         <!-- Loading/No Data Indicators -->
+                        <div class="position-relative"> <!-- Wrapper for indicators -->
+                            <div id="tableLoadingIndicator">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-0 mb-0 ms-2 text-muted">Loading accounts...</p> <!-- Adjusted alignment -->
+                            </div>
+                            
+                            <div id="tableNoDataIndicator" class="d-flex"> 
+                                 <i class="fas fa-info-circle fa-2x text-muted me-2"></i> 
+                                 <p class="mb-0 text-muted">No account data found for the selected filters.</p>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Portfolio Health Visuals (Below Table) -->
+            <div class="row g-3 mt-4">
+                 <div class="col-md-6">
+                     <div class="card h-100 shadow-sm"> <!-- Added shadow -->
+                         <div class="card-body d-flex flex-column">
+                             <h6 class="card-title text-center mb-2 h6 flex-shrink-0 text-secondary">Health Distribution</h6>
+                             <div class="chart-container-sm flex-grow-1">
+                                  <canvas id="healthDistChart"></canvas> <!-- *** CANVAS ADDED *** -->
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+                 <div class="col-md-6">
+                     <div class="card h-100 shadow-sm"> <!-- Added shadow -->
+                         <div class="card-body d-flex flex-column">
+                             <h6 class="card-title text-center mb-2 h6 flex-shrink-0 text-secondary">RFM Segment Distribution</h6>
+                             <div class="chart-container-sm flex-grow-1">
+                                 <canvas id="segmentDistChart"></canvas> <!-- *** CANVAS ADDED *** -->
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+            </div>
+        </div> <!-- End Action Hub Column -->
+    </div><!-- End Main Content Row -->
+
+    <!-- Notification Area -->
+    <div id="notification-area" class="position-fixed top-0 end-0 p-3" style="z-index: 1055; top: calc(var(--header-height, 70px) + 10px) !important;">
+        <!-- Notifications injected here by JS -->
+    </div>
+
+{% endblock %}
+
+
+{% block scripts %}
+    <!-- Dependencies: jQuery, Popper, Bootstrap, DataTables, Chart.js -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Ensure Popper is loaded before Bootstrap -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Font Awesome JS is optional if you only use CSS classes, but included for completeness -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/js/all.min.js"></script> -->
+
+    <!-- Inline script to READ data attribute -->
+    <script>
+        let initialSalesRepId = null; // Use let for potential reassignment if needed later
+        try {
+            const initialDataEl = document.getElementById('initial-data');
+            // Use optional chaining and nullish coalescing for safety
+            const rawValue = initialDataEl?.dataset?.initialSalesRepId ?? 'null';
+            // More robust check for empty/null string before parsing
+            if (rawValue && rawValue !== 'null' && rawValue !== '""') {
+                 initialSalesRepId = JSON.parse(rawValue);
+            }
+            console.log("Initial Sales Rep ID from data attribute:", initialSalesRepId);
+        } catch (e) {
+            console.error("Error parsing initial data from data attribute:", e);
+            // Keep initialSalesRepId as null if parsing fails
+        }
+    </script>
+    <!-- SHARED UTILITIES FIRST -->
+    <script src="{{ url_for('static', filename='js/dashboard_utils.js') }}"></script>
+
+    <!-- *** CORRECTED SCRIPT FILENAME *** -->
+    <script src="{{ url_for('static', filename='js/strategic_dashboard_list.js') }}"></script>
+
+
+    <script>
+        // Immediate fix for the tableNoDataIndicator issue
+        document.addEventListener('DOMContentLoaded', function() {
+          // Get reference to the problematic element
+          const tableNoDataIndicator = document.getElementById('tableNoDataIndicator');
+          
+          if (tableNoDataIndicator) {
+            // Force hide it immediately
+            tableNoDataIndicator.style.display = 'none';
+            
+            // Set up a periodic check to ensure it stays hidden unless data is actually empty
+            setInterval(function() {
+              const table = document.getElementById('accountActionTable');
+              const tableHasData = table && table.querySelector('tbody tr');
+              
+              // If table exists and has data rows, make sure indicator is hidden
+              if (tableHasData) {
+                tableNoDataIndicator.style.display = 'none';
+              }
+            }, 500); // Check every half second
+          }
+          
+          console.log("Applied emergency fix for tableNoDataIndicator");
+        });
+      </script>
+
+{% endblock %}

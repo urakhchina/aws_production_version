@@ -1,0 +1,747 @@
+{% extends "base_layout.html" %}
+
+{% block title %}Account Detail{% endblock %}
+
+{% block page_title %}<span id="accountName">Account Detail</span>{% endblock %}
+
+{% block head_css %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <style>
+        /* Specific styles for the detail page */
+        .metric-card {
+            background-color: var(--theme-card-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            height: 100%; /* Make cards in a row the same height */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .metric-card-header {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--theme-text-muted);
+            text-transform: uppercase;
+            margin-bottom: 0.75rem; /* Increased margin */
+            border-bottom: 1px solid var(--bs-border-color);
+            padding-bottom: 0.5rem; /* Increased padding */
+            display: flex; /* For aligning badge */
+            justify-content: space-between; /* For aligning badge */
+            align-items: center; /* For aligning badge */
+        }
+        .metric-card-body .metric-label {
+            font-weight: 500;
+            color: #6c757d;
+            font-size: 0.85rem;
+            display: block;
+            margin-bottom: 0.1rem;
+        }
+        .metric-card-body .metric-value {
+            font-weight: 600;
+            font-size: 1.1rem; /* Slightly larger for emphasis */
+            line-height: 1.3;
+            margin-bottom: 0.75rem; /* Increased space between metrics */
+            color: var(--theme-text);
+        }
+         .metric-card-body .metric-value-small { font-size: 0.9rem; margin-bottom: 0.25rem;}
+        .chart-card {
+            background-color: var(--theme-card-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            height: auto; 
+            min-height: 420px; 
+            max-height: none; 
+            overflow: visible; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-card-header {
+             font-size: 1.1rem; font-weight: 600; color: var(--theme-green-dark);
+             margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--bs-border-color);
+             flex-shrink: 0;
+        }
+        .chart-canvas-container {
+            position: relative; 
+            flex-grow: 1; 
+            min-height: 300px; 
+            height: 320px;    
+            width: 100%;
+        }
+        .chart-loading, .chart-error {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: var(--theme-text-muted); font-style: italic;
+        }
+        
+        .trend-value { font-weight: bold; }
+        .trend-positive { color: var(--bs-success); } 
+        .trend-negative { color: var(--bs-danger); } 
+        .trend-neutral { color: var(--theme-text-muted); }
+
+        /* --- NEW GROWTH ENGINE STYLES --- */
+        #growthOpportunityCard {
+            min-height: 400px;
+        }
+
+        .growth-engine-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            height: 100%;
+        }
+
+        .growth-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border: 2px solid var(--bs-border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .growth-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--bs-primary), var(--bs-success));
+            border-radius: 12px 12px 0 0;
+        }
+
+        .growth-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .growth-targets-section::before {
+            background: linear-gradient(90deg, var(--bs-primary), var(--bs-info));
+        }
+
+        .growth-products-section::before {
+            background: linear-gradient(90deg, var(--bs-success), var(--bs-warning));
+        }
+
+        .growth-section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--bs-border-color-translucent);
+        }
+
+        .growth-section-header i {
+            font-size: 1.1rem;
+            margin-right: 0.5rem;
+            color: var(--bs-primary);
+        }
+
+        .growth-section-header h6 {
+            margin: 0;
+            font-weight: 600;
+            color: var(--bs-dark);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .growth-targets-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .growth-metric {
+            text-align: center;
+            padding: 0.5rem;
+            background: rgba(255,255,255,0.7);
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .growth-metric-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--bs-secondary);
+            margin-bottom: 0.25rem;
+            letter-spacing: 0.5px;
+        }
+
+        .growth-metric-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--bs-primary);
+        }
+
+        .suggested-order-highlight {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, rgba(25, 135, 84, 0.1), rgba(25, 135, 84, 0.05));
+            border: 2px solid rgba(25, 135, 84, 0.2);
+        }
+
+        .suggested-order-highlight .growth-metric-value {
+            font-size: 1.3rem;
+            color: var(--bs-success);
+        }
+
+        .products-container {
+            max-height: 180px;
+            overflow-y: auto;
+            padding: 0.25rem;
+        }
+
+        .product-item {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 8px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .product-item:hover {
+            background: white;
+            border-color: var(--bs-primary);
+            transform: translateX(3px);
+        }
+
+        .product-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-name {
+            font-weight: 600;
+            color: var(--bs-dark);
+            font-size: 0.85rem;
+            line-height: 1.2;
+            margin-bottom: 0.25rem;
+        }
+
+        .product-sku {
+            font-size: 0.75rem;
+            color: var(--bs-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .product-reason-badge {
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .product-reason-badge i {
+            font-size: 0.7rem;
+        }
+
+        .products-empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--bs-secondary);
+        }
+
+        .products-empty-state i {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.5;
+        }
+
+        .status-badge-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .status-badge i {
+            font-size: 0.8rem;
+        }
+
+        /* Custom scrollbar for products */
+        .products-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .products-container::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+            border-radius: 2px;
+        }
+
+        .products-container::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.3);
+            border-radius: 2px;
+        }
+
+        .products-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0,0,0,0.5);
+        }
+
+        /* Old styles for other sections */
+        .cta-card-body { 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+        }
+
+        .sku-coverage-section {
+            text-align: center; 
+            margin-bottom: 1rem; 
+        }
+        .sku-coverage-section .metric-label {
+            font-size: 0.8rem;
+            color: var(--theme-text-muted);
+        }
+        .sku-coverage-section .metric-value {
+            font-size: 1.5rem; 
+            font-weight: 600;
+            color: var(--theme-green-dark); 
+        }
+
+        .quick-actions-buttons {
+            display: flex;
+            flex-direction: column; 
+            gap: 0.5rem; 
+        }
+
+        .quick-actions-buttons .btn {
+            width: 100%; 
+        }
+
+        .cta-coming-soon-text {
+            text-align: center;
+            font-size: 0.8rem;
+            margin-top: 0.75rem;
+        }
+        
+        .yearly-summary-card { 
+            background-color: var(--theme-card-bg);
+            border: 1px solid var(--bs-border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .yearly-summary-header { 
+             font-size: 1.1rem; font-weight: 600; color: var(--theme-green-dark);
+             margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--bs-border-color);
+             display: flex; 
+             justify-content: space-between; 
+             align-items: center; 
+        }
+        .yearly-summary-header .form-select-sm { 
+            width: auto; 
+            min-width: 80px; 
+        }
+
+        /* --- CSS Changes for Table Sorting START --- */
+        #yearlyProductSummaryTable thead th, #rollingSkuAnalysisTable thead th {
+            background-color: var(--bs-light); 
+            position: sticky; 
+            top: 0; 
+            z-index: 10; 
+            cursor: pointer; /* Make headers look clickable */
+            user-select: none; /* Prevent text selection on click */
+        }
+        #yearlyProductSummaryTable thead th .sort-indicator, #rollingSkuAnalysisTable thead th .sort-indicator { /* For sort arrows */
+            margin-left: 5px;
+            font-size: 0.8em;
+            color: var(--theme-text-muted); /* Default color for indicator */
+            display: inline-block; /* Allows for width/height if needed later */
+            width: 1em; /* Reserve space for the icon */
+        }
+        #yearlyProductSummaryTable thead th.sort-active .sort-indicator, #rollingSkuAnalysisTable thead th.sort-active .sort-indicator { /* Style for active sort column */
+            color: var(--bs-primary); /* Active sort indicator color */
+        }
+        /* --- CSS Changes for Table Sorting END --- */
+
+        .table-responsive-custom { 
+            max-height: 400px; 
+            overflow-y: auto;
+            border: 1px solid var(--bs-border-color-translucent); 
+            border-radius: 0.25rem;
+        }
+        #yearlyProductSummaryTable td, #yearlyProductSummaryTable th, #rollingSkuAnalysisTable td, #rollingSkuAnalysisTable th {
+            font-size: 0.85rem; 
+            vertical-align: middle; 
+        }
+        #yearlyProductSummaryTable .text-end, #rollingSkuAnalysisTable .text-end { 
+            text-align: right !important;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <input type="hidden" id="accountCanonicalCode" value="{{ account_code }}">
+
+    <div id="pageLoadingIndicator" class="text-center py-5" style="display: block;">
+        <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="mt-2 mb-0 text-muted">Loading account details...</p>
+    </div>
+
+     <div id="pageErrorIndicator" class="alert alert-danger text-center" role="alert" style="display: none;"></div>
+
+    <div id="accountDetailContent" style="display: none;">
+
+        <!-- Row 1: Key Metrics -->
+        <div class="row g-3 mb-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="metric-card">
+                    <div class="metric-card-header">Account</div>
+                    <div class="metric-card-body">
+                        <div>
+                            <span class="metric-label">CardCode</span>
+                            <span id="detailBaseCardCode" class="metric-value">--</span>
+                        </div>
+                        <div>
+                            <span class="metric-label">Address</span>
+                            <span id="detailFullAddress" class="metric-value metric-value-small" style="max-height: 60px; overflow-y: auto; display: block;">--</span>
+                        </div>
+                        <div>
+                            <span class="metric-label">Sales Rep</span>
+                            <span id="detailSalesRepName" class="metric-value">--</span>
+                        </div>
+                        <div>
+                            <span class="metric-label">Distributor</span>
+                            <span id="detailDistributorName" class="metric-value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="metric-card">
+                    <div class="metric-card-header">Performance</div>
+                    <div class="metric-card-body">
+                        <div>
+                        <span class="metric-group-label">Past Year (<span id="detailPyYearLabelPerf">PY</span>)</span>
+                        <span class="metric-label" id="detailPyTotalSalesLabelPerf">Total Sales</span>
+                        <span id="detailPyTotalRevenuePerf" class="metric-value">--</span>
+                        </div>
+                        <hr class="my-2"> 
+                        <div>
+                        <span class="metric-group-label">Current Year (<span id="detailCyYearLabelPerf">CY</span>)</span>
+                        <span class="metric-label">YTD Sales</span>
+                        <span id="detailCytdRevenueValuePerf" class="metric-value">--</span>
+                        </div>
+                        <div>
+                            <span class="metric-label">Year-End Pace (YEP)</span>
+                            <span id="detailYepRevenueValuePerf" class="metric-value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+             <div class="col-xl-3 col-md-6">
+                <div class="metric-card d-flex flex-column">
+                    <div class="metric-card-header">Quick Actions</div>
+                    <div class="metric-card-body cta-card-body flex-grow-1">
+                       
+                       <div class="sku-coverage-section">
+                           <span class="metric-label d-block">Top 30 SKU Coverage (Qtr)</span>
+                           <span id="ctaTop30Coverage" class="metric-value">--%</span>
+                       </div>
+                        
+                       <div class="quick-actions-buttons mt-auto"> 
+                            <button id="btnGenerateMarketingEmail" class="btn btn-outline-primary btn-sm" disabled>
+                               <i class="fas fa-bullhorn me-1"></i> Marketing Email
+                            </button>
+                            <button id="btnGenerateDiscountEmail" class="btn btn-outline-success btn-sm" disabled>
+                               <i class="fas fa-tags me-1"></i> Discount Email
+                            </button>
+                            <button id="btnGenerateReminderEmail" class="btn btn-outline-info btn-sm" disabled>
+                               <i class="fas fa-bell me-1"></i> Reminder Email
+                            </button>
+                            <p class="text-muted small mt-2 fst-italic cta-coming-soon-text">(Email generation coming soon)</p>
+                       </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="metric-card">
+                    <div class="metric-card-header">Growth</div>
+                    <div class="metric-card-body">
+                        <div class="text-center">
+                            <span class="metric-label d-block mb-2">Pace vs Last Year</span>
+                            <span id="detailGrowthPacePct" class="metric-value" style="font-size: 2.2rem; font-weight: 700;">--%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- End Row 1 -->
+
+        <!-- Row 2: Detailed Purchase Chart -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-12">
+                <div class="chart-card">
+                    <div class="chart-card-header">Detailed Purchase Timeline (CY vs PY)</div>
+                    <div class="chart-canvas-container">
+                        <div id="cadenceChartLoading" class="chart-loading" style="display: none;">Loading...</div>
+                        <div id="cadenceChartError" class="chart-error" style="display: none;">Error</div>
+                        <canvas id="cadenceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div><!-- End Row 2 -->
+
+        <!-- Row 3: Revenue History Chart & Growth Opportunity Engine -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-8">
+                <div class="chart-card">
+                <div class="chart-card-header">Yearly Revenue History</div>
+                    <div class="chart-canvas-container">
+                        <div id="revenueChartLoading" class="chart-loading" style="display: none;">Loading...</div>
+                        <div id="revenueChartError" class="chart-error" style="display: none;">Error</div>
+                    <canvas id="revenueChart"></canvas>
+                    </div>
+                    <div class="metric-card-body mt-3 border-top pt-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <span class="metric-label d-block">Yearly Revenue Trend</span>
+                                <span id="revenueTrend" class="metric-value d-inline-block">--</span>
+                                <span id="revenueTrendR2" class="metric-value metric-value-small d-inline-block text-muted ms-1"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="metric-label d-block">Next Year Revenue Forecast</span>
+                                <span id="revenueForecast" class="metric-value d-inline-block">--</span>
+                            </div>
+                        </div>
+                </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4" id="growthOpportunityCard">
+                <div class="metric-card h-100">
+                    <div class="metric-card-header">
+                        <span>Growth Opportunity Engine</span>
+                        <span id="growthEngineStatusBadge" class="badge ms-2" style="display: none;"></span>
+                    </div>
+                    <div class="metric-card-body">
+                        <!-- Status Message (for loading/errors/on-track messages) -->
+                        <div id="growthEngineMessage" class="mb-3 text-muted small fst-italic">
+                            Loading growth suggestions...
+                        </div>
+
+                        <!-- Main Growth Engine Content -->
+                        <div id="growthEngineDetails" class="growth-engine-container" style="display: none;">
+                            
+                            <!-- Growth Targets Section -->
+                            <div class="growth-section growth-targets-section">
+                                <div class="growth-section-header">
+                                    <i class="fas fa-target"></i>
+                                    <h6>Growth Targets</h6>
+                                </div>
+                                <div class="growth-targets-grid">
+                                    <div class="growth-metric">
+                                        <div class="growth-metric-label">Growth Target</div>
+                                        <div id="targetYepDisplay" class="growth-metric-value">N/A</div>
+                                    </div>
+                                    <div class="growth-metric" id="additionalRevNeededDisplayContainer" style="display: none;">
+                                        <div class="growth-metric-label">Additional Needed</div>
+                                        <div id="additionalRevNeededDisplay" class="growth-metric-value">N/A</div>
+                                    </div>
+                                    <div class="growth-metric suggested-order-highlight">
+                                        <div class="growth-metric-label">Suggested Next Order</div>
+                                        <div id="suggestedNextPurchaseAmountDisplay" class="growth-metric-value">N/A</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Recommended Products Section -->
+                            <div class="growth-section growth-products-section">
+                                <div class="growth-section-header">
+                                    <i class="fas fa-lightbulb"></i>
+                                    <h6>Recommended Products</h6>
+                                </div>
+                                <div id="growthEngineRecommendedProducts" class="products-container">
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm text-muted" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="text-muted small mt-2 mb-0">Loading recommendations...</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div> <!-- End growthEngineDetails -->
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End Row 3 -->
+
+
+        <!-- Row 4: Detailed Product Purchase History by Quarter -->
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="chart-card"> 
+                    <div class="chart-card-header d-flex justify-content-between align-items-center">
+                        <span>Product Purchase History by Quarter</span>
+                        <div>
+                            <label for="productHistoryYearSelect" class="form-label-sm me-2">Year:</label>
+                            <select id="productHistoryYearSelect" class="form-select form-select-sm d-inline-block" style="width: auto;"></select>
+                        </div>
+                    </div>
+                    <div id="productHistoryLoading" class="text-center py-3" style="display: none;">Loading product history...</div>
+                    <div id="productHistoryError" class="alert alert-warning text-center" style="display: none;">Error loading history.</div>
+                    <div id="productHistoryContent" class="mt-3">
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End Row 4 -->
+
+        <!-- Row 5: Yearly Product Purchase Summary Table -->
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="yearly-summary-card"> 
+                    <div class="yearly-summary-header">
+                        <span>Yearly Product Purchase Summary</span> 
+                        <div> 
+                            <label for="yearlyProductSummaryYearSelect" class="form-label-sm me-2 visually-hidden">Year:</label> 
+                            <select id="yearlyProductSummaryYearSelect" class="form-select form-select-sm"></select>
+                        </div>
+                    </div>
+                    <div id="yearlyProductSummaryLoading" class="text-center py-3" style="display: none;">
+                        <div class="spinner-border spinner-border-sm text-muted" role="status"></div>
+                        <span class="ms-2 text-muted">Loading yearly product summary...</span>
+                    </div>
+                    <div id="yearlyProductSummaryError" class="alert alert-warning text-center" style="display: none;">
+                        Error loading yearly product summary.
+                    </div>
+                    <div id="yearlyProductSummaryContentContainer"> 
+                        <div class="table-responsive-custom"> 
+                            <table class="table table-striped table-hover table-sm" id="yearlyProductSummaryTable">
+                                <thead>
+                                    <tr>
+                                        <!-- HTML Changes for Table Sorting START -->
+                                        <th data-column="description">Product Name (Description) <span class="sort-indicator"></span></th>
+                                        <th data-column="sku">SKU <span class="sort-indicator"></span></th>
+                                        <th data-column="total_quantity_year" class="text-end">Total Quantity (Year) <span class="sort-indicator"></span></th>
+                                        <th data-column="total_revenue_year" class="text-end">Total Revenue (Year) <span class="sort-indicator"></span></th>
+                                        <!-- HTML Changes for Table Sorting END -->
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted p-3">Select a year to view summary.</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr id="yearlyProductSummaryTableTotalsRow" style="font-weight: bold; background-color: var(--bs-light-bg-subtle, #f8f9fa);">
+                                        <td colspan="2" class="text-end">Totals for <span id="yearlyTotalsForYear"></span>:</td>
+                                        <td id="yearlyTotalQuantityCell" class="text-end">--</td>
+                                        <td id="yearlyTotalRevenueCell" class="text-end">--</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End Row 5 -->
+
+        <!-- Row 6: Rolling 12-Month Product Analysis -->
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="yearly-summary-card"> <!-- Re-using card style for consistency -->
+                    <div class="yearly-summary-header">
+                        <span>Rolling 12-Month Product Analysis</span>
+                    </div>
+                    <div id="rollingAnalysisLoading" class="text-center py-3" style="display: none;">
+                        <div class="spinner-border spinner-border-sm text-muted" role="status"></div>
+                        <span class="ms-2 text-muted">Loading product analysis...</span>
+                    </div>
+                    <div id="rollingAnalysisError" class="alert alert-warning text-center" style="display: none;">
+                        Error loading analysis.
+                    </div>
+                    <div id="rollingAnalysisContent" style="display: none;">
+                        <!-- Tab Navigation -->
+                        <ul class="nav nav-tabs" id="analysisTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="apl-tab" data-bs-toggle="tab" data-bs-target="#apl-tab-pane" type="button" role="tab" aria-controls="apl-tab-pane" aria-selected="true">Purchased SKUs (APL)</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="opportunities-tab" data-bs-toggle="tab" data-bs-target="#opportunities-tab-pane" type="button" role="tab" aria-controls="opportunities-tab-pane" aria-selected="false">Top 30 Opportunities</button>
+                            </li>
+                        </ul>
+
+                        <!-- Tab Content -->
+                        <div class="tab-content pt-3" id="analysisTabContent">
+                            <!-- APL Tab Pane -->
+                            <div class="tab-pane fade show active" id="apl-tab-pane" role="tabpanel" aria-labelledby="apl-tab" tabindex="0">
+                                <div class="table-responsive-custom">
+                                    <table class="table table-striped table-hover table-sm" id="rollingSkuAnalysisTable">
+                                        <thead>
+                                            <tr>
+                                                <th data-column="description">Product Name</th>
+                                                <th data-column="item_code">SKU</th>
+                                                <th class="text-end" data-column="prior_12m_rev">Revenue (Prior 12m) <span class="sort-indicator"></span></th>
+                                                <th class="text-end" data-column="current_12m_rev">Revenue (Last 12m)</th>
+                                                <th class="text-end" data-column="sku_yep">SKU YEP (Current Year)</th>
+                                                <th class="text-end" data-column="yoy_change_pct">YoY Change % (Rolling)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- JS will populate this -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Opportunities Tab Pane -->
+                            <div class="tab-pane fade" id="opportunities-tab-pane" role="tabpanel" aria-labelledby="opportunities-tab" tabindex="0">
+                                <div id="top30OpportunitiesList" class="list-group">
+                                    <!-- JS will populate this -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End Row 6 -->
+
+    </div> <!-- End accountDetailContent -->
+
+{% endblock %}
+
+
+{% block scripts %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js" integrity="sha512-HrwQrg8S/xLPE6Qwe7XOghA/FOxX+tuVF4TxbvS73/zKJSs/b1gVl/P4MsdfTFWYFYg/ISVNYIINcg35Xvr6QQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="{{ url_for('static', filename='js/dashboard_utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/account_detail.js') }}"></script>
+{% endblock %}

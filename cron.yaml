@@ -1,0 +1,7 @@
+version: 1
+cron:
+  - name: rebuild-mapping
+    url: /tasks/build-mapping
+    minute: 30
+    hour: 6        # 06:30 UTC = 22:30 PST
+    day_of_week: 1 # 0=Sunday … 6=Saturday; Tuesday catches the first UTC day after the feed

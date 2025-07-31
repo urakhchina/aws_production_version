@@ -1,0 +1,989 @@
+/* Dashboard Main Styles - Irwin Naturals Green Theme */
+:root {
+    /* === Irwin Naturals Brand Palette === */
+    --irwin-green-bright: #8dc63f;
+    --irwin-green-dark: #4b802c;
+    --irwin-green-yellow: #e5ea87;
+    --irwin-offwhite-beige: #f1f1e4;
+    --irwin-light-muted-green: #e1ead4;
+    --irwin-light-beige: #ebddcd;
+    --irwin-warning-gold: #e9c46a; /* Keeping warm gold */
+    --irwin-danger-red: #d16b55;  /* Keeping softer red */
+
+    /* === Theme Mapping === */
+    --primary-color: var(--irwin-green-bright); /* Bright Green */
+    --primary-dark: var(--irwin-green-dark);   /* Dark Green */
+    --secondary-color: var(--irwin-green-dark); /* Using dark green for success/secondary */
+    --secondary-dark: #3a6823; /* Slightly darker than dark green */
+    --warning-color: var(--irwin-warning-gold);
+    --danger-color: var(--irwin-danger-red);
+    --info-color: var(--irwin-green-dark); /* Using dark green for info */
+
+    --light-color: var(--irwin-light-muted-green); /* Light muted green */
+    --text-color: var(--irwin-green-dark); /* Dark green text */
+    --text-muted: #8a9b8e; /* Muted Greenish Grey */
+    --text-light: #a3b1a7; /* Lighter muted green */
+    --background-color: var(--irwin-offwhite-beige); /* Page background */
+    --card-bg: #ffffff;
+    --border-color: var(--irwin-light-muted-green); /* Light muted green border */
+
+    /* Layout Variables */
+    --sidebar-width: 260px;
+    --header-height: 70px;
+    --bs-primary-rgb: 141, 198, 63; /* RGB for #8dc63f */
+
+    /* Bootstrap variable aliases for consistency */
+    --bs-primary: var(--primary-color);
+    --bs-primary-rgb: 141, 198, 63; /* RGB for #8dc63f */
+    --bs-secondary: var(--text-muted);
+    --bs-secondary-rgb: 138, 155, 142; /* RGB for #8a9b8e */
+    --bs-success: var(--secondary-color); /* Dark Green */
+    --bs-success-rgb: 75, 128, 44; /* RGB for #4b802c */
+    --bs-danger: var(--danger-color);
+    --bs-danger-rgb: 209, 107, 85;
+    --bs-warning: var(--warning-color);
+    --bs-warning-rgb: 233, 196, 106;
+    --bs-info: var(--info-color); /* Dark Green */
+    --bs-info-rgb: 75, 128, 44;
+    --bs-light: var(--light-color);
+    --bs-light-rgb: 225, 234, 212; /* RGB for #e1ead4 */
+    --bs-dark: var(--text-color); /* Dark Green */
+    --bs-dark-rgb: 75, 128, 44;
+    --bs-body-color: var(--text-color);
+    --bs-body-bg: var(--background-color);
+    --bs-border-color: var(--border-color);
+    --bs-link-color: var(--primary-dark); /* Dark Green links */
+    --bs-link-hover-color: var(--primary-color); /* Bright Green hover */
+
+    /* Light variants for badges */
+    --bs-success-light: rgba(var(--bs-success-rgb), 0.15);
+    --bs-danger-light: rgba(var(--bs-danger-rgb), 0.15);
+    --bs-warning-light: rgba(var(--bs-warning-rgb), 0.15);
+    --bs-primary-light: rgba(var(--bs-primary-rgb), 0.15);
+    --bs-secondary-light: rgba(var(--bs-secondary-rgb), 0.15);
+    
+    /* Theme-specific variables */
+    --theme-green-primary: var(--irwin-green-bright);
+    --theme-green-dark: var(--irwin-green-dark);
+    --theme-green-secondary: var(--irwin-green-bright);
+    --theme-green-lighter: var(--irwin-light-muted-green);
+    --theme-border: var(--irwin-light-muted-green);
+    --theme-text: var(--irwin-green-dark);
+    --theme-text-muted: var(--text-muted);
+    --theme-card-bg: #ffffff;
+    --theme-white: #ffffff;
+    --theme-warning-text: #664d03;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Prevent horizontal scroll */
+    position: relative; /* Needed for some sticky implementations */
+}
+
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: var(--sidebar-width);
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #163a20 100%); /* Dark green gradient */
+    color: var(--theme-white);
+    position: fixed; /* Fixed position */
+    top: 0;
+    left: 0;
+    height: 100vh; /* Full viewport height */
+    overflow-y: auto; /* Scroll sidebar only if content overflows */
+    transition: all 0.3s ease;
+    z-index: 1000;
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: rgba(255,255,255,0.2) rgba(0,0,0,0.1); /* Firefox */
+}
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+.sidebar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.2); border-radius: 3px; }
+
+.sidebar-header {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.sidebar-header h4 { font-size: 1.3rem; margin: 0; color: var(--theme-white); }
+.sidebar-header a:hover { text-decoration: none; }
+
+.sidebar-profile {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.profile-image { margin-right: 15px; font-size: 2.5rem; }
+.profile-info h5 { margin: 0; font-weight: 600; font-size: 1rem; }
+.profile-info p { margin: 5px 0 0; opacity: 0.7; font-size: 0.85rem; }
+
+.sidebar-nav { list-style: none; padding: 0; margin: 20px 0; }
+.sidebar-nav .nav-item { margin-bottom: 2px; } /* Slightly reduced margin */
+.sidebar-nav .nav-link { /* Target Bootstrap class */
+    display: flex;
+    align-items: center;
+    padding: 10px 20px; /* Adjusted padding */
+    color: rgba(255, 255, 255, 0.8); /* Slightly muted text */
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+    font-size: 0.95rem;
+}
+
+.sidebar-nav .nav-link i.fa-fw { /* Target FontAwesome fixed width icons */
+    margin-right: 12px;
+    width: 20px;
+    text-align: center;
+    opacity: 0.8;
+}
+
+.sidebar-nav .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--theme-white);
+}
+
+.sidebar-nav .nav-item.active .nav-link { /* Use .nav-item.active */
+    background-color: rgba(var(--bs-primary-rgb), 0.2); /* Use bright green with transparency */
+    border-left-color: var(--primary-color);
+    color: var(--theme-white);
+    font-weight: 500;
+}
+.sidebar-nav .nav-item.active .nav-link i {
+    opacity: 1;
+}
+
+/* Main Content Styles */
+.main-content {
+    flex-grow: 1; /* Take remaining space */
+    margin-left: var(--sidebar-width); /* Space for fixed sidebar */
+    padding: 20px; /* Default padding */
+    transition: margin-left 0.3s ease; /* Animate if sidebar collapses */
+}
+@media (max-width: 991.98px) { /* Collapse sidebar below large screens */
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.active { transform: translateX(0); } /* JS needs to toggle this class */
+    .main-content { margin-left: 0; }
+}
+
+/* Top Navigation Bar */
+.top-nav {
+    margin-bottom: 25px; /* Increased spacing */
+    background-color: var(--theme-card-bg) !important; /* Ensure white bg */
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06); /* Subtle shadow */
+    padding: 0.75rem 1rem; /* Adjust padding */
+}
+.nav-title h1 { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--text-color); } /* Adjusted size */
+.nav-actions { display: flex; align-items: center; }
+.date-display { margin-right: 20px; font-weight: 500; color: var(--text-muted); font-size: 0.9rem; }
+.btn-refresh { background-color: var(--primary-color); color: var(--theme-white); border: none; transition: all 0.3s ease; }
+.btn-refresh:hover { background-color: var(--primary-dark); color: var(--theme-white); }
+
+/* Filter Section */
+.filter-section {
+    background-color: var(--theme-card-bg);
+    border-radius: 8px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Added shadow */
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color); /* Added border */
+}
+.filter-section .form-label { font-weight: 500; margin-bottom: 0.3rem; font-size: 0.85rem; color: var(--text-muted); }
+.filter-section .form-select-sm, .filter-section .btn-sm { font-size: 0.875rem; } /* Consistent small size */
+
+/* ===== Summary Stats Card Styles ===== */
+.summary-stats-card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid var(--border-color);
+    background-color: var(--theme-card-bg);
+}
+.summary-stats-card h5 { /* Card Title */
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem !important;
+}
+.summary-stats-card h6 { /* Sub-headings */
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.2rem;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+.summary-stats-card p { /* Avg Coverage number */
+    margin-bottom: 0;
+    font-weight: bold;
+    line-height: 1.2;
+}
+.summary-stats-card #summaryAvgCoverage {
+    color: var(--bs-primary);
+}
+.summary-stats-card .dist-label { /* Distribution labels */
+   font-weight: 600;
+}
+.summary-stats-card .d-flex span strong { /* Distribution counts */
+    font-weight: 700;
+}
+.summary-stats-card .border-end-md { /* Responsive border */
+   border-right: none;
+}
+@media (min-width: 768px) {
+   .summary-stats-card .border-end-md {
+       border-right: 1px solid var(--border-color) !important;
+   }
+}
+#summaryCoverageDistribution span {
+    margin-bottom: 0.25rem;
+}
+/* ===== END Summary Stats Card Styles ===== */
+
+/* KPI Summary Section */
+.kpi-summary { margin-bottom: 25px; }
+.kpi-card {
+    background-color: var(--theme-card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    min-height: 120px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid var(--border-color);
+}
+.kpi-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.kpi-icon {
+    font-size: 2rem;
+    width: 50px; height: 50px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    margin-right: 15px; color: var(--theme-white); flex-shrink: 0;
+}
+.total-revenue .kpi-icon { background-color: var(--primary-color); }
+.total-accounts .kpi-icon { background-color: var(--secondary-color); }
+.avg-health .kpi-icon { background-color: var(--warning-color); }
+.avg-churn .kpi-icon { background-color: var(--danger-color); }
+.high-risk .kpi-icon { background-color: var(--danger-color); }
+.high-risk-value .kpi-icon { background-color: var(--danger-color); opacity: 0.8; }
+.overdue .kpi-icon { background-color: var(--warning-color); }
+.kpi-content { flex: 1; }
+.kpi-content h3, .kpi-label { font-size: 0.85rem; margin: 0 0 5px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; }
+.kpi-value { font-size: 1.75rem; font-weight: 700; margin-bottom: 5px; color: var(--text-color);}
+.kpi-trend { display: flex; align-items: center; font-size: 0.85rem; }
+.kpi-trend.positive { color: var(--secondary-dark); }
+.kpi-trend.negative { color: var(--danger-color); }
+.kpi-trend i { font-size: 0.8em; }
+.trend-value { margin-left: 5px; font-weight: 500; }
+
+/* --- Snapshot/KPI Cards (Small version from action hub) --- */
+.kpi-card-sm { 
+    padding: 0.8rem; 
+    text-align: center; 
+    border-radius: 6px; 
+    background-color: var(--theme-card-bg); 
+    border: 1px solid var(--border-color); 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04); 
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.kpi-card-sm:hover { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(0,0,0,0.06); }
+.kpi-card-sm .kpi-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.2rem; font-weight: 500;}
+.kpi-card-sm .kpi-value { font-size: 1.3rem; font-weight: 700; line-height: 1.1; margin-bottom: 0; }
+.kpi-card-sm .kpi-value a { text-decoration: none; color: inherit; }
+.kpi-card-sm .kpi-value a:hover { color: var(--primary-color); }
+.kpi-card-sm i { margin-right: 3px; }
+
+/* Chart Containers */
+.chart-container {
+    background-color: var(--theme-card-bg);
+    border-radius: 8px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Added shadow */
+    padding: 20px;
+    height: 100%;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+.chart-title.h5 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 0; margin-bottom: 15px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    color: var(--text-color);
+}
+.chart-wrapper {
+    position: relative;
+    flex-grow: 1;
+    min-height: 250px;
+}
+
+/* Chart Containers (Small) */
+.chart-container-sm { height: 180px; position: relative; }
+
+/* ===== CHART CARD STYLES FOR ACCOUNT DETAIL PAGE ===== */
+.chart-card {
+    background-color: var(--theme-card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem; /* More padding for charts */
+    margin-bottom: 1.5rem;
+    height: auto; /* Let it adjust to content instead of 100% */
+    min-height: 350px; /* But ensure minimum height */
+    max-height: 450px; /* And maximum height */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chart-card-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--theme-green-dark);
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-canvas-container {
+    position: relative;
+    flex-grow: 1;
+    min-height: 280px; /* Ensure minimum height for charts */
+    max-height: 400px; /* Add max height to prevent excessive growth */
+    height: 350px; /* Fixed height for consistency */
+    width: 100%; /* Ensure width is explicitly set */
+}
+
+/* Make sure charts themselves have proper constraints */
+#cadenceChart, #revenueChart {
+    max-height: 100%; /* Fill the container but don't exceed it */
+    width: 100%;
+    height: 100%;
+}
+
+.chart-loading, .chart-error {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; color: var(--theme-text-muted); font-style: italic;
+}
+
+/* Current period highlight label */
+.current-period-label {
+    font-size: 0.8rem;
+    font-weight: normal;
+    color: var(--theme-white);
+    background-color: var(--theme-green-dark);
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+}
+
+/* Chart annotation */
+.chart-annotation {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 255, 255, 0.85);
+    padding: 0.75rem 1rem;
+    border-radius: 5px;
+    text-align: center;
+    z-index: 5;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    max-width: 80%;
+}
+
+.chart-annotation p {
+    margin: 0;
+    color: #666;
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+/* Better loading states for charts */
+.chart-loading, .chart-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Media queries for responsive chart sizing */
+@media (max-width: 768px) {
+    .chart-card {
+        min-height: 300px;
+        max-height: 400px;
+    }
+    .chart-canvas-container {
+        min-height: 220px;
+        height: 280px;
+    }
+}
+/* ===== END CHART CARD STYLES ===== */
+
+/* == Specific Styles for Strategic Plot == */
+#strategicAccountPlotContainer {
+    position: relative; /* Needed for Chart.js responsiveness */
+    height: 60vh; /* Adjust height as needed */
+    min-height: 400px;
+    width: 100%;
+    flex-grow: 1; /* Allow it to fill chart container */
+}
+/* Styles for loading/no data indicators (positioning etc) */
+#plotLoadingIndicator, #plotNoDataIndicator {
+   position: absolute; /* Position over the canvas */
+   top: 0; left: 0; width: 100%; height: 100%;
+   background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent overlay */
+   display: flex; /* Use flex for centering */
+   flex-direction: column; /* Stack icon and text */
+   justify-content: center;
+   align-items: center;
+   font-size: 1.1rem;
+   color: var(--text-muted);
+   z-index: 10; /* Ensure it's above the canvas */
+   border-radius: 8px; /* Match card radius */
+   text-align: center; /* Ensure text centers if it wraps */
+}
+#plotLoadingIndicator .spinner-border {
+    width: 3rem; height: 3rem; /* Larger spinner */
+    margin-bottom: 1rem;
+    color: var(--bs-primary); /* Use theme color */
+}
+#plotNoDataIndicator i { /* Style icon if used */
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+/* == End Specific Styles for Strategic Plot == */
+
+/* ===== Action Hub Table Styles ===== */
+#accountActionTable { font-size: 0.9rem; width: 100% !important; /* Ensure DT takes full width */ }
+#accountActionTable thead th { 
+    background-color: var(--theme-green-lighter); /* Light green tint for header */
+    white-space: nowrap; /* Prevent header wrapping */ 
+    color: var(--text-color);
+}
+#accountActionTable .priority-score-cell { font-weight: bold; text-align: center; white-space: nowrap; }
+#accountActionTable .reason-cell { text-align: center; font-size: 1.1em; white-space: nowrap; }
+#accountActionTable .reason-cell .reason-icon { margin: 0 2px; cursor: default; } /* Add spacing */
+#accountActionTable tbody tr { cursor: pointer; }
+#accountActionTable tbody tr.selected-row td { /* Highlight selected row */
+    background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+    /* Use BS5 variable if accent bg not working */
+    --bs-table-accent-bg: rgba(var(--bs-primary-rgb), 0.1) !important;
+}
+/* Ensure hover doesn't override selection */
+#accountActionTable.table-hover > tbody > tr.selected-row:hover > td {
+     background-color: rgba(var(--bs-primary-rgb), 0.12) !important; /* Slightly darker on hover */
+     --bs-table-accent-bg: rgba(var(--bs-primary-rgb), 0.12) !important;
+ }
+#accountActionTable .dataTables_wrapper .row:first-child { padding-top: 0.5rem; }
+#accountActionTable .dataTables_wrapper .row:last-child { padding-bottom: 0.5rem; }
+#accountActionTable td, #accountActionTable th { vertical-align: middle; } /* Align content vertically */
+
+/* Health badge classes */
+.badge.bg-health-excellent { background-color: var(--secondary-color) !important; color: var(--theme-white) !important; } /* Dark Green */
+.badge.bg-health-good { background-color: var(--primary-color) !important; color: var(--theme-white) !important; } /* Bright Green */
+.badge.bg-health-average { background-color: var(--bs-warning) !important; color: var(--theme-warning-text) !important; } /* Gold */
+.badge.bg-health-poor { background-color: #fd7e14 !important; color: var(--theme-white) !important; } /* Keep Orange */
+.badge.bg-health-critical { background-color: var(--bs-danger) !important; color: var(--theme-white) !important; } /* Keep Red */
+/* ===== End Action Hub Table Styles ===== */
+
+/* Loading/No Data Indicators */
+
+
+#tableLoadingIndicator, #tableNoDataIndicator {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center; width: 80%; padding: 2rem;
+    background-color: rgba(255, 255, 255, 0.85);
+    border-radius: 8px; z-index: 10;
+    flex-direction: column; align-items: center; justify-content: center;
+
+    display: none;
+}
+
+
+
+#tableNoDataIndicator.active {
+    display: flex !important; 
+}
+
+/*
+#tableLoadingIndicator {
+}
+.dataTables_wrapper { position: relative; min-height: 200px; }
+
+#tableLoadingIndicator .spinner-border { }
+#tableNoDataIndicator i {  }
+#tableNoDataIndicator p, #tableLoadingIndicator p { }
+*/
+
+/* --- Quick Filters --- */
+.quick-filters { padding-bottom: 0.5rem; /* Add some space below filters */ }
+.quick-filters .btn { margin-right: 5px; margin-bottom: 5px; font-size: 0.8rem; padding: 0.25rem 0.6rem; }
+.quick-filters .btn i { margin-right: 4px; }
+.quick-filters .btn.active { /* Style for active filter */
+    background-color: var(--primary-dark) !important; /* Ensure override */
+    border-color: var(--primary-dark) !important;
+    color: var(--theme-white) !important;
+    font-weight: 500;
+}
+
+/* --- Sticky Positioning --- */
+.sticky-top-under-header {
+    position: -webkit-sticky; /* Safari */
+    position: sticky;
+    top: calc(var(--header-height) + 20px); /* Adjust based on your header + padding */
+    z-index: 900; /* Below main nav if needed */
+}
+
+/* ===== Context Panel Styles ===== */
+.context-panel {
+    background-color: var(--theme-green-lighter); /* Light green background */
+    border-left: 1px solid var(--border-color);
+    padding: 1.25rem;
+    height: calc(100vh - var(--header-height) - 40px); /* Viewport height minus header/padding */
+    overflow-y: auto;
+    position: sticky; /* Sticky position */
+    top: calc(var(--header-height) + 20px); /* Position below header (adjust 20px based on main content padding) */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #ccc var(--theme-green-lighter); /* Firefox */
+}
+.context-panel::-webkit-scrollbar { width: 6px; }
+.context-panel::-webkit-scrollbar-track { background: var(--theme-green-lighter); border-radius: 3px;}
+.context-panel::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px;}
+.context-panel::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+.context-panel h5 { /* Account Name */
+    font-size: 1.2rem; /* Slightly larger */
+    font-weight: 600;
+    color: var(--primary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+}
+.context-panel .metric-group { margin-bottom: 1.25rem; } /* More spacing */
+.context-panel .metric-label {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 0.8rem; /* Smaller label */
+    display: block;
+    margin-bottom: 0.1rem;
+    text-transform: uppercase; /* Uppercase labels */
+}
+.context-panel .metric-value { font-weight: 600; font-size: 0.95rem; line-height: 1.3; } /* Slightly smaller value */
+.context-panel .metric-value .small { font-size: 0.8rem; font-weight: normal; color: var(--text-muted); }
+.context-panel .reason-breakdown ul { padding-left: 0; list-style: none; margin-bottom: 0.5rem; } /* No bullets */
+.context-panel .reason-breakdown li { font-size: 0.9rem; margin-bottom: 0.3rem; padding-left: 1.2rem; position: relative; }
+.context-panel .reason-breakdown li i { position: absolute; left: 0; top: 4px; color: var(--text-muted); } /* Position icons */
+.context-panel .suggested-action {
+    font-style: italic;
+    background-color: #edf3ee; /* Light green tint */
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    border: 1px dashed #c6d6ca; /* Green tinted border */
+    margin-top: 0.5rem;
+}
+.context-panel .product-list-container {
+     max-height: 100px; /* Adjust as needed */
+     overflow-y: auto;
+     padding: 0.5rem;
+     background-color: rgba(226, 235, 227, 0.5); /* Light green background */
+     border-radius: 6px;
+     margin-top: 0.25rem; /* Space above list */
+     border: 1px solid #c6d6ca; /* Green tinted border */
+     scrollbar-width: thin;
+}
+.context-panel .product-list-container::-webkit-scrollbar { width: 6px; }
+.context-panel .product-list-container::-webkit-scrollbar-thumb { background-color: rgba(107, 127, 110, 0.5); border-radius: 3px; }
+.context-panel .product-badge { font-size: 0.75rem; padding: 0.25em 0.6em; } /* Styles from other section */
+
+/* In your dashboard.css or <style> block */
+.product-history-item {
+    /* Add any base styling for all items if needed */
+}
+
+.chart-card .metric-card-body.mt-3.border-top.pt-3 {
+    flex-shrink: 0; /* Prevent this section from shrinking if the card has a fixed height constraint elsewhere */
+    /* No specific height needed here, it should take up its natural content height */
+}
+
+/* Ensure the canvas container doesn't cause issues if its height is too rigid */
+.chart-card .chart-canvas-container {
+    /* Your existing: position: relative; flex-grow: 1; min-height: 280px; max-height: 400px; height: 350px; */
+    /* Let's try making height more flexible initially by relying on flex-grow and min/max */
+    height: auto; /* Override fixed height to see if it helps parent expand */
+    min-height: 300px; /* Or whatever your desired minimum is */
+}
+
+
+.product-history-item.product-top-30 {
+    background-color: #e8f5e9; /* A very light green */
+    border-left: 4px solid #4CAF50; /* A more prominent green */
+    padding-left: 8px !important; /* Ensure padding is applied */
+    border-radius: 3px; /* Match other item styles */
+}
+.product-history-item .fw-bold { /* Product Description */
+    display: block; /* Ensure it takes full width before SKU */
+    margin-bottom: 0.1rem;
+}
+.product-list-container ul {
+    list-style-type: none; /* Remove bullets if not already done */
+    padding-left: 0; /* Remove default ul padding */
+}
+
+
+/* Health Gauge in Context Panel */
+#contextHealthGaugeContainer { height: 8px; border-radius: 4px; background-color: #e2ebe3; overflow: hidden; }
+#contextHealthGauge { height: 100%; border-radius: 4px; transition: width 0.6s ease-out, background-color 0.6s ease; background-color: var(--text-muted); }
+/* ===== End Context Panel Styles ===== */
+
+/* ===== MODIFIED & NEW: Strategic Insight Panel & Coverage ===== */
+.account-insight-panel {
+    background-color: var(--theme-green-lighter); /* Light green background */
+    border-radius: 8px; /* Match other cards */
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    min-height: 450px; /* Ensure enough space */
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Match other cards */
+    display: flex;
+    flex-direction: column; /* Stack content vertically */
+    height: 100%; /* Try to fill column height */
+}
+ .account-insight-panel h5 { /* Account Name */
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem; /* Reduced bottom margin */
+    font-weight: 600;
+    color: var(--text-color); /* Standard text color */
+    border-bottom: 1px solid var(--border-color); /* Separator */
+    padding-bottom: 0.5rem;
+ }
+ .account-insight-panel p { /* Base paragraph style in panel */
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+ }
+ .insight-label { /* Labels like RFM, Health, Coverage */
+    font-weight: 600;
+    color: var(--bs-primary); /* Use primary color for labels */
+    margin-right: 5px;
+ }
+ /* Specific style for percentage value */
+ #insightCoveragePercent {
+    color: var(--bs-primary);
+    font-weight: 700; /* Make percentage bold */
+ }
+
+ /* Product List Containers (Carried/Missing) */
+ .account-insight-panel .product-list-container {
+     max-height: 85px; /* Max height before scroll */
+     overflow-y: auto; /* Enable scroll */
+     padding: 0.35rem 0.5rem; /* Inner padding */
+     background-color: #e2ebe3; /* Light green background */
+     border-radius: 4px;
+     margin-bottom: 0.75rem; /* Space below each list */
+     border: 1px solid #c6d6ca; /* Green tinted border */
+     scrollbar-width: thin;
+     scrollbar-color: #ccc #e2ebe3;
+ }
+ .account-insight-panel .product-list-container::-webkit-scrollbar { width: 5px; }
+ .account-insight-panel .product-list-container::-webkit-scrollbar-track { background: #e2ebe3; border-radius: 3px;}
+ .account-insight-panel .product-list-container::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px;}
+ .account-insight-panel .product-list-container::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+ /* Badges within the product lists */
+ .account-insight-panel .product-badge {
+     font-size: 0.78rem; /* Adjust size as needed */
+     padding: 0.25em 0.5em;
+     font-weight: 500;
+     display: inline-block; /* Allows wrapping */
+     margin-bottom: 0.25rem; /* Vertical space when wrapping */
+     margin-right: 0.25rem; /* Horizontal space */
+     line-height: 1.3;
+     /* Colors set dynamically via JS (bg-success, bg-secondary) */
+ }
+
+ /* Placeholder text style inside lists */
+ .account-insight-panel .text-muted.small.fst-italic {
+     display: block; /* Ensure it takes block space */
+     text-align: center;
+     padding: 0.5rem 0; /* Add some vertical padding */
+ }
+
+ /* Action Text Area */
+ #insightActionText {
+     margin-top: auto; /* Push to bottom */
+     padding-top: 0.5rem;
+     font-size: 0.88rem;
+     line-height: 1.4;
+ }
+ #insightActionText p { margin-bottom: 0.5rem;}
+ #insightActionText strong { color: var(--text-color); } /* Make strong text stand out slightly */
+ #insightActionText i { margin-right: 4px; } /* Space after icons */
+ #insightActionText hr {
+     margin-top: 0.5rem;
+     margin-bottom: 0.5rem;
+     border-top: 1px solid var(--border-color);
+ }
+/* ===== END Strategic Insight Panel Styles ===== */
+
+/* Product list styles for account detail page */
+.product-list-container {
+     max-height: 120px; overflow-y: auto; padding: 0.5rem;
+     background-color: var(--theme-green-lighter); border-radius: 4px;
+     margin-top: 0.25rem; border: 1px solid var(--theme-border);
+     scrollbar-width: thin; scrollbar-color: #ccc var(--theme-green-lighter);
+}
+.product-list-container::-webkit-scrollbar { width: 5px; }
+.product-list-container::-webkit-scrollbar-track { background: var(--theme-green-lighter); border-radius: 3px;}
+.product-list-container::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px;}
+.product-list-container::-webkit-scrollbar-thumb:hover { background: #aaa; }
+.product-badge {
+     font-size: 0.8rem; padding: 0.3em 0.6em; font-weight: 500;
+     display: inline-block; margin-bottom: 0.3rem; margin-right: 0.3rem;
+     line-height: 1.3; border-radius: 4px;
+}
+
+/* Health Gauge */
+.health-gauge-container { height: 10px; border-radius: 5px; background-color: #e9ecef; overflow: hidden; margin-top: 0.25rem; margin-bottom: 0.75rem; }
+.health-gauge { height: 100%; border-radius: 5px; transition: width 0.6s ease-out, background-color 0.6s ease; background-color: #6c757d; }
+
+/* Top Accounts Section */
+.top-accounts-section {
+    background-color: var(--theme-card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color);
+}
+.top-accounts-section h2 {
+    font-size: 1.2rem; font-weight: 600; margin-top: 0; margin-bottom: 20px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+.top-accounts-container {}
+
+/* Sales Rep Panel */
+.sales-rep-panel {
+    background-color: var(--theme-green-lighter); /* Light green background */
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.rep-header {
+    background-color: var(--primary-color);
+    color: var(--theme-white);
+    padding: 12px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+.rep-header h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.rep-performance { display: flex; align-items: center; }
+.rep-metric { margin-left: 10px; background-color: rgba(255, 255, 255, 0.2); padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; }
+.rep-accounts-list {
+    list-style: none; padding: 0; margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    flex-grow: 1;
+    scrollbar-width: thin;
+    scrollbar-color: #ccc var(--theme-green-lighter);
+}
+.rep-accounts-list::-webkit-scrollbar { width: 6px; }
+.rep-accounts-list::-webkit-scrollbar-track { background: var(--theme-green-lighter); border-radius: 3px; }
+.rep-accounts-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+.rep-accounts-list::-webkit-scrollbar-thumb:hover { background: #aaa; }
+.account-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 0.9rem;
+}
+.account-item:hover { background-color: rgba(var(--bs-primary-rgb), 0.1); } /* Light green hover */
+.account-item:last-child { border-bottom: none; }
+.account-details { flex: 1; min-width: 0; margin-right: 10px; }
+.account-name { font-weight: 500; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-revenue { color: var(--text-muted); font-size: 0.85rem; }
+.account-secondary-metric { flex-shrink: 0; }
+.account-growth {
+    font-weight: 500; font-size: 0.8rem; padding: 2px 8px; border-radius: 12px;
+    display: inline-flex; align-items: center; white-space: nowrap;
+}
+.growth-positive { background-color: var(--bs-success-light); color: var(--secondary-dark); }
+.growth-negative { background-color: var(--bs-danger-light); color: var(--danger-color); }
+.growth-icon { margin-right: 4px; font-size: 0.8em; }
+
+/* Data Table Section */
+.data-table-section {
+    background-color: var(--theme-card-bg);
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color);
+}
+.table-title {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);
+}
+.table-title h2 { font-size: 1.2rem; font-weight: 600; margin: 0; color: var(--text-color); }
+.table-responsive { overflow-x: auto; }
+table.table { margin-bottom: 0; font-size: 0.9rem; }
+table.table thead th {
+    background-color: var(--theme-green-lighter); /* Light green background */
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-color); font-weight: 600; white-space: nowrap;
+    padding: 0.6rem 0.75rem;
+}
+table.table tbody tr:hover { background-color: rgba(var(--bs-primary-rgb), 0.05); } /* Light green hover */
+table.table td { padding: 0.6rem 0.75rem; vertical-align: middle; }
+th .sort-icon { margin-left: 5px; color: #ccc; cursor: pointer; transition: color 0.2s ease;}
+th:hover .sort-icon { color: var(--text-muted); }
+th .sort-icon.active { color: var(--primary-color); }
+/* Badge styles within table */
+td .badge { font-weight: 500; }
+.bg-success-light { background-color: var(--bs-success-light) !important; color: var(--secondary-dark) !important; }
+.bg-danger-light { background-color: var(--bs-danger-light) !important; color: var(--danger-color) !important; }
+.bg-warning-light { background-color: var(--bs-warning-light) !important; color: var(--warning-color) !important; }
+.bg-primary-light { background-color: var(--bs-primary-light) !important; color: var(--primary-dark) !important; }
+.bg-secondary-light { background-color: var(--bs-secondary-light) !important; color: var(--text-muted) !important; }
+
+.table-pagination { display: flex; justify-content: flex-end; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.pagination { margin-bottom: 0; }
+
+/* Account Details Modal */
+.modal-header { border-bottom-color: var(--border-color); }
+.modal-footer { border-top-color: var(--border-color); }
+.account-details-header {
+    margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);
+}
+.account-details-header h3 { margin: 0 0 5px; font-weight: 600; color: var(--primary-color); }
+.account-details-header p { margin-bottom: 0.25rem; }
+.account-details-header .fs-sm { font-size: 0.85rem; }
+.modal-body .text-muted { color: var(--text-muted) !important; }
+.modal-body .badge { font-size: 0.85rem; padding: 0.4em 0.6em; }
+.modal-chart-container {
+    padding: 15px;
+    box-shadow: none;
+    border: 1px solid var(--border-color);
+    background-color: var(--theme-card-bg);
+}
+.modal-chart-container .chart-wrapper { min-height: 220px; }
+.modal-chart-container .h6 { font-size: 0.95rem; color: var(--text-muted); }
+#yearlyProductsContainer {
+    max-height: 250px; overflow-y: auto; padding: 0.75rem; background-color: var(--theme-green-lighter); border-radius: 4px;
+    border: 1px solid var(--border-color);
+    scrollbar-width: thin; scrollbar-color: #ccc var(--theme-green-lighter);
+}
+#yearlyProductsContainer::-webkit-scrollbar { width: 6px; }
+#yearlyProductsContainer::-webkit-scrollbar-track { background: var(--theme-green-lighter); border-radius: 3px;}
+#yearlyProductsContainer::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px;}
+#yearlyProductsContainer h6 { font-size: 0.9rem; margin-bottom: 0.5rem; }
+#yearlyProductsContainer .list-inline-item .badge { font-size: 0.75rem; padding: 0.3em 0.5em; font-weight: 400; }
+#yearlyProductsContainer .text-success { color: var(--secondary-dark) !important; }
+#yearlyProductsContainer .border-success { border-color: var(--secondary-color) !important; }
+
+.address-detail-row td {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    border-top: 1px dashed #c6d6ca !important; /* Green dashed separator */
+    /* Make text slightly smaller if desired */
+    font-size: 0.85rem;
+}
+/* Style for highlighting the main row when address is shown */
+/* Ensure your modal table has class="table-hover" */
+.table-hover tbody tr.table-active,
+.table-hover tbody tr.table-active:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.1) !important; /* Bootstrap primary light */
+    /* Add a slight border maybe? */
+    /* border-left: 3px solid var(--bs-primary); */
+}
+
+/* Responsive Adjustments */
+@media (max-width: 767.98px) {
+    .main-content { padding: 15px; }
+    .top-nav { margin-bottom: 15px; padding: 0.5rem 1rem;}
+    .nav-title h1 { font-size: 1.3rem; }
+    .kpi-card { flex-direction: column; align-items: flex-start; text-align: left; min-height: 0; padding: 15px; }
+    .kpi-icon { margin-right: 0; margin-bottom: 10px; width: 45px; height: 45px; font-size: 1.8rem;}
+    .kpi-value { font-size: 1.6rem; }
+    .chart-wrapper { height: 250px; min-height: 200px; }
+    /* Stack filters */
+    .filter-section .col-md-3, .filter-section .col-md-4, .filter-section .col-md-6 { margin-bottom: 10px; }
+    .table-title { flex-direction: column; align-items: flex-start; }
+    .table-title .btn { margin-top: 10px; }
+    .sales-rep-panel { min-width: calc(100% - 10px); } /* Full width panels */
+    .account-details-header { flex-direction: column; align-items: flex-start !important; } /* Stack header info */
+    .account-details-header .col-md-5 { text-align: left !important; align-items: flex-start !important; margin-top: 1rem !important; } /* Align metrics left */
+    /* Adjust summary card layout for small screens */
+    .summary-stats-card .border-end-md { border-right: none !important; } /* Remove border */
+    .summary-stats-card .col-md-4 { border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; } /* Add bottom border */
+    
+    /* Context panel becomes full width on mobile */
+    .context-panel {
+        position: static; /* Remove sticky positioning */
+        height: auto; /* Auto height */
+        margin-top: 1.5rem; /* Add space above */
+        border-left: none; /* Remove left border */
+        border: 1px solid var(--border-color); /* Add border all around */
+        border-radius: 8px; /* Round corners */
+    }
+}
+
+/* Loading state overlay (optional) */
+body.is-loading::after {
+    content: 'Loading...';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    z-index: 1100; /* Above sidebar/modal backdrop */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Notification Area */
+#notification-area { position: fixed; top: calc(var(--header-height) + 10px); right: 20px; z-index: 1055; }
+#notification-area .alert { min-width: 250px; }
+/* Ensure alert colors use the theme overrides */
+#notification-area .alert-success { background-color: var(--bs-success-light); border-color: var(--bs-border-color); color: var(--secondary-dark); }
+#notification-area .alert-danger { background-color: var(--bs-danger-light); border-color: var(--bs-border-color); color: var(--danger-color); }
+#notification-area .alert-warning { background-color: var(--bs-warning-light); border-color: var(--bs-border-color); color: var(--warning-color); }
+#notification-area .alert-info { background-color: var(--bs-primary-light); border-color: var(--bs-border-color); color: var(--primary-dark); }
+
+body:not(.show-no-data) div.card div.table-responsive div.position-relative #tableNoDataIndicator {
+    display: none !important;
+}

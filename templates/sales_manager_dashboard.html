@@ -1,0 +1,164 @@
+{% extends "base_layout.html" %}
+
+{% block title %}Sales Performance{% endblock %}
+
+{% block page_title %}Sales Performance Dashboard{% endblock %}
+
+{% block content %}
+<!-- Filters Row -->
+<div class="filter-section card card-body mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3 col-sm-6">
+            <label for="yearFilter" class="form-label form-label-sm">Year</label>
+            <select id="yearFilter" class="form-select form-select-sm">
+                <!-- Options populated by JS -->
+                <option>Loading...</option>
+            </select>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <label for="distributorFilter" class="form-label form-label-sm">Distributor</label>
+            <select id="distributorFilter" class="form-select form-select-sm">
+                <option value="">All Distributors</option>
+                <!-- Options populated by JS -->
+            </select>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <label for="salesRepFilter" class="form-label form-label-sm">Sales Rep</label>
+            <select id="salesRepFilter" class="form-select form-select-sm">
+                <option value="">All Sales Reps</option>
+                <!-- Options populated by JS -->
+            </select>
+        </div>
+        <div class="col-md-3 col-sm-6">
+             <button id="applyFilters" class="btn btn-primary btn-sm w-100">Apply Filters</button>
+             <!-- Refresh button is in the top nav now -->
+        </div>
+    </div>
+</div>
+
+<!-- KPI Row -->
+<div class="row g-3 kpi-summary mb-4">
+    <!-- Total Revenue -->
+     <div class="col-md-6 col-lg-3">
+         <div class="kpi-card total-revenue">
+             <div class="kpi-icon"><i class="fas fa-dollar-sign"></i></div>
+             <div class="kpi-content">
+                 <h3>Total Revenue</h3>
+                 <div class="kpi-value" id="totalRevenue">-</div>
+                 <div class="kpi-trend" id="revenueTrend"><i class="fas me-1"></i> <span class="trend-value">-%</span></div>
+             </div>
+         </div>
+     </div>
+     <!-- Total Accounts -->
+     <div class="col-md-6 col-lg-3">
+         <div class="kpi-card total-accounts">
+              <div class="kpi-icon"><i class="fas fa-users"></i></div>
+              <div class="kpi-content">
+                  <h3>Total Accounts</h3>
+                  <div class="kpi-value" id="totalAccounts">-</div>
+                  <div class="kpi-trend" id="accountsTrend"><i class="fas me-1"></i> <span class="trend-value">-%</span></div>
+              </div>
+         </div>
+     </div>
+     <!-- Avg Health -->
+     <div class="col-md-6 col-lg-3">
+          <div class="kpi-card avg-health">
+               <div class="kpi-icon"><i class="fas fa-heartbeat"></i></div>
+               <div class="kpi-content">
+                   <h3>Avg Health Score</h3>
+                   <div class="kpi-value" id="avgHealth">-</div>
+                   <div class="kpi-trend" id="healthTrend"><i class="fas me-1"></i> <span class="trend-value">-%</span></div>
+               </div>
+          </div>
+      </div>
+      <!-- Avg Churn 
+      <div class="col-md-6 col-lg-3">
+          <div class="kpi-card avg-churn">
+               <div class="kpi-icon"><i class="fas fa-sign-out-alt"></i></div>
+               <div class="kpi-content">
+                   <h3>Avg Churn Risk</h3>
+                   <div class="kpi-value" id="avgChurn">-%</div>
+                   <div class="kpi-trend" id="churnTrend"><i class="fas me-1"></i> <span class="trend-value">-%</span></div>
+               </div>
+          </div>
+      </div> -->
+</div><!-- End KPI Row -->
+
+
+<!-- Charts Row -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="chart-container card card-body h-100"> <!-- Added h-100 -->
+            <h2 class="chart-title h5">Sales Rep Revenue & YoY Growth</h2>
+            <div class="chart-wrapper"><canvas id="salesRepPerformanceChart"></canvas></div>
+        </div>
+    </div>
+     <div class="col-lg-6">
+        <div class="chart-container card card-body h-100">
+            <h2 class="chart-title h5">Revenue Distribution</h2>
+            <div class="chart-wrapper"><canvas id="revenueDistributionChart"></canvas></div>
+        </div>
+    </div>
+     <div class="col-lg-6">
+        <div class="chart-container card card-body h-100">
+            <h2 class="chart-title h5">Top Account YoY Growth Movers</h2>
+            <div class="chart-wrapper"><canvas id="yoyGrowthChart"></canvas></div>
+        </div>
+    </div>
+     <div class="col-lg-6">
+        <div class="chart-container card card-body h-100">
+            <h2 class="chart-title h5">Account Health Distribution</h2>
+            <div class="chart-wrapper"><canvas id="healthScoreDistributionChart"></canvas></div>
+        </div>
+    </div>
+</div><!-- End Charts Row -->
+
+
+<!-- Top Accounts Section -->
+<div class="top-accounts-section card card-body mb-4">
+    <!-- Title updated dynamically by JS -->
+    <h2 class="card-title h5 mb-3" id="topAccountsTitle">Top Accounts by Sales Rep</h2>
+    <div id="topAccountsContainer">
+        <!-- Content generated by JS (multi-rep panels or single-rep focused view) -->
+        <p class="text-center text-muted">Loading accounts...</p>
+    </div>
+</div>
+
+<!-- Data Table Section -->
+<div class="data-table-section card card-body mb-4">
+    <div class="table-title d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">Account List Detail</h2>
+        <button id="exportCsv" class="btn btn-sm btn-outline-secondary"><i class="fas fa-download me-1"></i> Export CSV</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle" id="accountsTable">
+            <thead class="table-light">
+              <tr>
+                <th>Account</th>
+                <th>Current Revenue</th>
+                <th>YoY Growth</th>
+                <th>Distributor</th>
+                <th>Health</th>
+                <!-- <th>Churn Risk</th> -->
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="7" class="text-center text-muted">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+     <!-- Optional Pagination for Table -->
+     <!-- <nav aria-label="Table pagination"><ul class="pagination pagination-sm justify-content-end"> ... </ul></nav> -->
+</div>
+
+<!-- Account Details Modal (Included from partial) -->
+{% include 'partials/_account_details_modal.html' %}
+
+{% endblock %}
+
+
+{% block scripts %}
+<!-- Specific JavaScript for THIS dashboard -->
+<script src="{{ url_for('static', filename='js/sales-manager-dashboard.js') }}"></script>
+{% endblock %}

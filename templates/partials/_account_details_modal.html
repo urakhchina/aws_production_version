@@ -1,0 +1,69 @@
+<!-- templates/partials/_account_details_modal.html -->
+
+<!-- Account Details Modal -->
+<div class="modal fade" id="accountDetailsModal" tabindex="-1" aria-labelledby="accountDetailsModalLabel" aria-hidden="true">
+    <!-- Use scrollable and large size -->
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"> <!-- Changed to modal-xl for more space -->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="accountDetailsModalLabel">Account Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Account Details Header Row -->
+                <div class="account-details-header row mb-3 pb-3 border-bottom align-items-center">
+                    <!-- Left Side: Name, ID, Address -->
+                    <div class="col-md-7">
+                        <h3 id="accountName" class="mb-1 text-primary">Account Name</h3>
+                        <p class="text-muted mb-1" id="accountCode">ID: Loading...</p>
+                        <p class="text-muted mb-0 fs-sm" id="accountAddress">Address loading...</p>
+                    </div>
+                    <!-- Right Side: Metrics -->
+                    <div class="col-md-5 d-flex flex-column align-items-md-end justify-content-center mt-2 mt-md-0 text-md-end">
+                         <div class="mb-1"><span class="text-muted fs-sm">Total Revenue (Selected Year):</span> <strong id="accountRevenue">$0.00</strong></div>
+                         <div class="mb-1"><span class="text-muted fs-sm">YoY Growth:</span> <span id="accountGrowth"><span class="badge bg-secondary">N/A</span></span></div>
+                         <div class="mb-1"><span class="text-muted fs-sm">Health Score:</span> <span id="accountHealth"><span class="badge bg-secondary">N/A</span></span></div>
+                         <div class="mb-0"><span class="text-muted fs-sm">Sales Rep:</span> <strong id="accountSalesRep">N/A</strong></div>
+                    </div>
+                </div>
+                <!-- End Header & Metrics Row -->
+
+                <!-- Charts Row -->
+                <div class="row account-details-charts mb-4">
+                    <div class="col-lg-6 mb-3 mb-lg-0"> <!-- Use col-lg-6 for wider screens -->
+                        <div class="chart-container modal-chart-container h-100 card card-body"> <!-- Added card style -->
+                             <h5 class="chart-title h6 text-center mb-2">Revenue per Year</h5>
+                             <div class="chart-wrapper" style="height: 250px;"> <!-- Increased height slightly -->
+                                 <canvas id="accountRevenueHistory"></canvas>
+                             </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                         <div class="chart-container modal-chart-container h-100 card card-body"> <!-- Added card style -->
+                             <h5 class="chart-title h6 text-center mb-2">Transactions per Year</h5>
+                             <div class="chart-wrapper" style="height: 250px;">
+                                <canvas id="accountTransactionsHistory"></canvas> <!-- Ensure this ID is correct -->
+                             </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End Charts Row -->
+
+                <!-- Yearly Products Section -->
+                <div class="mt-4 pt-3 border-top">
+                    <h5 class="mb-3">Products Purchased by Year</h5>
+                    <div id="yearlyProductsContainer" style="max-height: 250px; overflow-y: auto; padding: 0.5rem; background-color: #f8f9fa; border-radius: 4px;">
+                        <!-- Products loaded by JS -->
+                        <p class="text-center text-muted m-2">Loading products...</p>
+                    </div>
+                </div>
+                <!-- End Yearly Products Section -->
+
+            </div> <!-- End modal-body -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- End Account Details Modal -->
