@@ -578,6 +578,13 @@ def get_account_details(canonical_code):
                 sku_item['is_top_30'] = sku_item['item_code'] in TOP_30_SET
         # +++ END ADDITION +++
 
+        # --- DEBUG: Print distributor uploads data to terminal ---
+        #print("--- DEBUG: Data being sent to frontend ---")
+        #print("distributor_uploads:")
+        #for upload in distributor_uploads:
+        #    print(f"  {upload}")
+        #print("------------------------------------------")
+
         # --- Final JSON Response ---
         return jsonify({
             "prediction": prediction_data_dict,
