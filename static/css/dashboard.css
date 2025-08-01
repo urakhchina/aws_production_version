@@ -169,6 +169,8 @@ body {
     margin-left: var(--sidebar-width); /* Space for fixed sidebar */
     padding: 20px; /* Default padding */
     transition: margin-left 0.3s ease; /* Animate if sidebar collapses */
+    min-height: 100vh; /* <-- ADD THIS LINE */
+    height: auto;      /* <-- AND ADD THIS LINE */
 }
 @media (max-width: 991.98px) { /* Collapse sidebar below large screens */
     .sidebar { transform: translateX(-100%); }
@@ -339,13 +341,12 @@ body {
     border-radius: 8px;
     padding: 1.5rem; /* More padding for charts */
     margin-bottom: 1.5rem;
-    height: auto; /* Let it adjust to content instead of 100% */
+    height: auto; /* Let it adjust to content */
     min-height: 350px; /* But ensure minimum height */
-    max-height: 450px; /* And maximum height */
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* max-height and overflow:hidden have been removed to prevent cutoff */
 }
 
 .chart-card-header {
