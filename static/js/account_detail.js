@@ -10,6 +10,45 @@ if (typeof formatCurrency !== 'function' || typeof formatDate !== 'function' || 
     }
 }
 
+// Ensure utilities are loaded first via HTML script order
+if (typeof formatCurrency !== 'function' || typeof formatDate !== 'function' || typeof formatValue !== 'function' || typeof getHealthColorInfo !== 'function') {
+    console.error("ERROR: One or more utility functions from dashboard_utils.js seem to be missing!");
+    const errorDiv = document.getElementById('pageErrorIndicator');
+    if(errorDiv) {
+        errorDiv.textContent = "Critical error: UI helper functions not loaded. Please contact support.";
+        errorDiv.style.display = 'block';
+    }
+}
+
+// 🔴 ADD THIS BLOCK HERE 🔴
+// ----- Distributor → colour map  ------------------------------------------
+// Add/adjust colours as you like.  Any distributor not in the map
+// gets a pastel colour generated on-the-fly and remembered.
+const DISTRIBUTOR_COLORS = {
+    // Primaries ───────────────
+    PALKO     : '#f1c40f',  // strong blue
+    THRESHOLD : '#2ca02c',  // vivid green
+    UNFI      : '#e6550d',  // deep orange
+    KEHE      : '#9467bd',  // purple
+    DIRECT    : '#d62728',  // red
+    INFRA     : '#17becf',  // cyan / teal
+  
+    // Extras (if you know them) ─────────
+    //VITAMINLIFE: '#8c564b', // brown
+    NONE       : '#636363', // grey fallback when “distributor” is blank
+  };
+function ensureDistributorColor(name) {
+    const key = (name || 'UNKNOWN').toUpperCase();
+    if (!DISTRIBUTOR_COLORS[key]) {
+        // Generate a soft pastel colour deterministically from the name
+        let hash = 0; for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
+        const hue = hash % 360; const sat = 45; const light = 60;
+        DISTRIBUTOR_COLORS[key] = `hsl(${hue},${sat}%,${light}%)`;
+    }
+    return DISTRIBUTOR_COLORS[key];
+}
+// 🔴 END NEW BLOCK 🔴
+
 document.addEventListener('DOMContentLoaded', function () {
     console.log("Account Detail JS Initializing...");
 
@@ -989,39 +1028,116 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function renderDetailedPurchaseTimelineChart(cyTimelineData, pyTimelineData, nextExpectedDateStr) { 
-        if(cadenceChartLoadingEl) showLoading(cadenceChartLoadingEl, false);
-        if (!cadenceChartCanvas) { if(cadenceChartErrorEl) showError(cadenceChartErrorEl, "Canvas element not found."); return; }
-        const currentYear = new Date().getFullYear(); const yearStart = new Date(currentYear, 0, 1); const yearEnd = new Date(currentYear, 11, 31); 
-        const cyScatterData = (Array.isArray(cyTimelineData) ? cyTimelineData : []).map(point => {
-                try { const purchaseDate = new Date(point.x); const revenue = parseFloat(point.daily_revenue);
-                    if (isNaN(purchaseDate.getTime()) || isNaN(revenue)) { return null; }
-                    return { x: purchaseDate, y: revenue };
-                } catch (e) { return null; } }).filter(p => p !== null);
-        const pyScatterData = (Array.isArray(pyTimelineData) ? pyTimelineData : []).map(point => {
-                try { const normalizedDate = normalizeDateToCurrentYear(point.x); const revenue = parseFloat(point.daily_revenue);
-                    if (!normalizedDate || isNaN(revenue)) { return null; }
-                    return { x: normalizedDate, y: revenue };
-                } catch (e) { return null; } }).filter(p => p !== null);
-        if(cadenceChartErrorEl) hideError(cadenceChartErrorEl);
-        if (cyScatterData.length === 0 && pyScatterData.length === 0) {
-            if(cadenceChartErrorEl) showError(cadenceChartErrorEl, "No purchase data available for CY or PY.");
-            if (cadenceChartInstance) { cadenceChartInstance.destroy(); cadenceChartInstance = null; } return;
+    function renderDetailedPurchaseTimelineChart(cyTimelineData, pyTimelineData, nextExpectedDateStr) {
+        if (cadenceChartLoadingEl) showLoading(cadenceChartLoadingEl, false);
+        if (!cadenceChartCanvas) { if (cadenceChartErrorEl) showError(cadenceChartErrorEl, "Canvas missing."); return; }
+    
+        // Helper: convert API rows → {x:Date, y:number, distributor:string}
+        const toPoint = (row) => {
+            try {
+                return {
+                    x: new Date(row.x),
+                    y: parseFloat(row.daily_revenue || 0),
+                    distributor: (row.distributor || 'UNKNOWN').toUpperCase(),
+                };
+            } catch { return null; }
+        };
+    
+        const CY_POINTS = (Array.isArray(cyTimelineData) ? cyTimelineData : []).map(toPoint).filter(p => p && !isNaN(p.y));
+        const PY_POINTS = (Array.isArray(pyTimelineData) ? pyTimelineData : []).map(toPoint).filter(p => p && !isNaN(p.y));
+    
+        if (!CY_POINTS.length && !PY_POINTS.length) {
+            if (cadenceChartErrorEl) showError(cadenceChartErrorEl, "No purchase data for CY/PY.");
+            if (cadenceChartInstance) cadenceChartInstance.destroy();
+            return;
         }
-        const ctx = cadenceChartCanvas.getContext('2d'); if (cadenceChartInstance) cadenceChartInstance.destroy();
-        let annotations = {}; const annotationPlugin = Chart.registry.plugins.get('annotation');
+    
+        // ---------- build datasets per distributor & year ----------
+        const datasetMap = {}; // key = `${dist}|CY` or `${dist}|PY`
+        const addPoint = (arr, labelSuffix) => {
+            arr.forEach(pt => {
+                const key = `${pt.distributor}|${labelSuffix}`;
+                if (!datasetMap[key]) {
+                    datasetMap[key] = {
+                        label: `${pt.distributor} (${labelSuffix})`,
+                        data: [],
+                        backgroundColor: ensureDistributorColor(pt.distributor),
+                        borderColor: ensureDistributorColor(pt.distributor),
+                        pointRadius: labelSuffix === 'CY' ? 6 : 5,
+                        pointHoverRadius: 8,
+                    };
+                }
+                datasetMap[key].data.push({ x: pt.x, y: pt.y });
+            });
+        };
+        addPoint(CY_POINTS, 'CY');
+        addPoint(PY_POINTS, 'PY');
+    
+        const datasets = Object.values(datasetMap);
+    
+        // Annotation for next expected purchase (unchanged logic)
+        let annotations = {};
+        const annotationPlugin = Chart.registry.plugins.get('annotation');
+        const currentYear = new Date().getFullYear();
         if (annotationPlugin && nextExpectedDateStr) {
-            try { const nextExpectedDate = new Date(nextExpectedDateStr);
-                    if (!isNaN(nextExpectedDate.getTime()) && nextExpectedDate.getFullYear() === currentYear) { 
-                    annotations = { line1: { type: 'line', scaleID: 'x', value: nextExpectedDate.valueOf(), borderColor: 'rgba(220, 53, 69, 0.7)', borderWidth: 2, borderDash: [6, 6], label: { enabled: true, content: `Expected (${formatDate(nextExpectedDate, 'short')})`, position: 'start', backgroundColor: 'rgba(220, 53, 69, 0.1)', color: '#dc3545', font: { size: 10 } } } }; }
-            } catch (e) { console.error("Error processing date for annotation:", e); } }
-        try {
-            cadenceChartInstance = new Chart(ctx, { type: 'scatter', data: { datasets: [ { label: 'Current Year Purchases', data: cyScatterData, backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: 'rgba(25, 135, 84, 1)', pointRadius: 6, pointHoverRadius: 8, }, { label: 'Previous Year Purchases', data: pyScatterData, backgroundColor: 'rgba(32, 201, 151, 0.6)', borderColor: 'rgba(32, 201, 151, 1)', pointRadius: 5, pointHoverRadius: 7, } ] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'time', time: { unit: 'month', tooltipFormat: 'MMM d, yyyy', displayFormats: { month: 'MMM' } }, min: yearStart.valueOf(), max: yearEnd.valueOf(), title: { display: true, text: 'Date' } }, y: { type: 'linear', beginAtZero: true, title: { display: true, text: 'Purchase Amount ($)' }, ticks: { callback: function(value) { return formatCurrency(value); } } } },
-                    plugins: { tooltip: { callbacks: { title: function(tooltipItems) { const date = new Date(tooltipItems[0].parsed.x); return formatDate(date) || ''; }, label: function(context) { const label = context.dataset.label || ''; const value = context.parsed.y; return `${label}: ${formatCurrency(value)}`; } } }, legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle' } }, ...(annotationPlugin && Object.keys(annotations).length > 0 ? { annotation: { annotations: annotations } } : {}) },
-                    layout: { padding: { top: 10, right: 20 } } } });
-        } catch (chartError) { console.error("Error creating Detailed Scatter chart:", chartError); if(cadenceChartErrorEl) showError(cadenceChartErrorEl, "Failed to render detailed purchase chart."); }
-    }
+            const nextDate = new Date(nextExpectedDateStr);
+            if (!isNaN(nextDate) && nextDate.getFullYear() === currentYear) {
+                annotations = {
+                    nextPurchase: {
+                        type: 'line',
+                        scaleID: 'x',
+                        value: nextDate.valueOf(),
+                        borderColor: 'rgba(220,53,69,0.7)',
+                        borderWidth: 2,
+                        borderDash: [6,6],
+                        label: {
+                            enabled: true,
+                            content: `Expected (${formatDate(nextDate, 'short')})`,
+                            position: 'start',
+                            backgroundColor: 'rgba(220,53,69,0.1)',
+                            color: '#dc3545',
+                            font: { size: 10 },
+                        },
+                    },
+                };
+            }
+        }
+    
+        // Destroy old chart if present
+        if (cadenceChartInstance) cadenceChartInstance.destroy();
+    
+        const ctx = cadenceChartCanvas.getContext('2d');
+        cadenceChartInstance = new Chart(ctx, {
+            type: 'scatter',
+            data: { datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'month', tooltipFormat: 'MMM d, yyyy', displayFormats: { month: 'MMM' } },
+                        title: { display: true, text: 'Date' },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Purchase Amount ($)' },
+                        ticks: { callback: v => formatCurrency(v) },
+                    },
+                },
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle' } },
+                    tooltip: {
+                        callbacks: {
+                            title: items => formatDate(new Date(items[0].parsed.x)),
+                            label: ctx => `${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
+                        },
+                    },
+                    ...(annotationPlugin ? { annotation: { annotations } } : {}),
+                },
+            },
+        });
+    }  // --- end new renderDetailedPurchaseTimelineChart ---
     
     function renderRevenueChart(revenueData, analysisData, correctCurrentYearYep) { 
         if(revenueChartLoadingEl) showLoading(revenueChartLoadingEl, false);
