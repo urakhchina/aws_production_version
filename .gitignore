@@ -98,3 +98,5 @@ analysis_reports/
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+
+kehe_unfi_data.csv
