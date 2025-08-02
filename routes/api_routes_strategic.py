@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, date
 import logging
 import json
 from collections import defaultdict, OrderedDict
+import math
 
 logger = logging.getLogger(__name__) 
 
@@ -445,6 +446,18 @@ def get_account_details(canonical_code):
 
         growth_engine_data = { "target_yep_plus_1_pct": prediction_data_dict.get('target_yep_plus_1_pct'), "additional_revenue_needed_eoy": prediction_data_dict.get('additional_revenue_needed_eoy'), "suggested_next_purchase_amount": prediction_data_dict.get('suggested_next_purchase_amount'), "recommended_products": described_recommended_products_for_growth_engine, "message": prediction_data_dict.get('growth_engine_message'), "already_on_track": (prediction_data_dict.get('additional_revenue_needed_eoy') is not None and prediction_data_dict.get('additional_revenue_needed_eoy') <= 0) }
         
+
+        # --- THIS IS THE FIX ---
+        # Also clean the growth_engine_data dictionary for any NaN values
+        cleaned_growth_engine_data = {}
+        for key, value in growth_engine_data.items():
+            if isinstance(value, float) and math.isnan(value):
+                cleaned_growth_engine_data[key] = None
+            else:
+                cleaned_growth_engine_data[key] = value
+        # --- END FIX ---
+
+
         revenue_history_data_dict = {"years": [str(h['year']) for h in historical_summary_list], "revenues": [h['revenue'] for h in historical_summary_list]}
         current_year = datetime.utcnow().year; previous_year = current_year - 1
         
@@ -585,12 +598,21 @@ def get_account_details(canonical_code):
         #    print(f"  {upload}")
         #print("------------------------------------------")
 
+
+        cleaned_prediction_data = {}
+        for key, value in prediction_data_dict.items():
+            if isinstance(value, float) and math.isnan(value):
+                cleaned_prediction_data[key] = None # Replace NaN with None
+            else:
+                cleaned_prediction_data[key] = value
+        # --- END FIX ---
+
         # --- Final JSON Response ---
         return jsonify({
-            "prediction": prediction_data_dict,
+            "prediction": cleaned_prediction_data,
             "historical_summary": historical_summary_list, 
             "analysis": analysis_data_dict,
-            "growth_engine": growth_engine_data,
+            "growth_engine": cleaned_growth_engine_data,
             "chart_data": {
                 "revenue_history": revenue_history_data_dict,
                 "cy_purchase_timeline": cy_timeline_data_list,

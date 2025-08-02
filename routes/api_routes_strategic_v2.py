@@ -11,6 +11,7 @@ import numpy as np  # Add numpy for mean calculation
 from sklearn.linear_model import LinearRegression
 from collections import defaultdict
 from collections import defaultdict
+import math
 
 # --- Import Config safely for Thresholds ---
 # (This assumes config.py is accessible)
@@ -186,47 +187,33 @@ def get_strategic_accounts_data_v2():
     """
     logger.info("Received request for strategic accounts data (V2 Endpoint)")
 
-    # --- Get and Validate Filters ---
+    # --- Get and Validate Filters (Unchanged) ---
     sales_rep_id = request.args.get('sales_rep')
     distributor = request.args.get('distributor')
-    # Add health/segment filters if implemented in frontend later
-    # health_category = request.args.get('health_category')
-    # rfm_segment = request.args.get('rfm_segment')
     log_msg = (f"Filtering V2 - Rep ID: {sales_rep_id or 'All (Inc. Unassigned)'}, "
-               f"Dist: {distributor or 'All'}") # Add other filters if used
+               f"Dist: {distributor or 'All'}")
     logger.info(log_msg)
 
     try:
-        # --- Base Query (SQLAlchemy 2.x style) ---
-        stmt = select(AccountPrediction) # Select the full AccountPrediction object
-
-        # --- Apply Optional Filters ---
+        # --- Base Query and Filtering (Unchanged) ---
+        stmt = select(AccountPrediction)
         conditions = []
         if distributor:
             conditions.append(AccountPrediction.distributor == distributor)
-        # Add health/segment conditions here if filters are active
-        # if health_category: conditions.append(AccountPrediction.health_category == health_category)
-        # if rfm_segment: conditions.append(AccountPrediction.rfm_segment == rfm_segment)
-
-        # --- Apply Sales Rep Filter ---
         if sales_rep_id == "__UNASSIGNED__":
             conditions.append(or_(AccountPrediction.sales_rep == None, AccountPrediction.sales_rep == ''))
         elif sales_rep_id:
             conditions.append(AccountPrediction.sales_rep == sales_rep_id)
-        # else: No rep filter needed for "All"
 
         if conditions:
             stmt = stmt.where(*conditions)
 
-        # --- Apply Sorting by Priority Score ---
         stmt = stmt.order_by(AccountPrediction.enhanced_priority_score.desc().nullslast())
-
-        # --- Fetch ALL Filtered Data from DB ---
-        # No limit here, fetch all matching accounts
+        
         accounts = db.session.execute(stmt).scalars().all()
         logger.info(f"Found {len(accounts)} accounts matching filters for V2 endpoint.")
 
-        # --- Calculate Comprehensive Summary Statistics ---
+        # --- Calculate Comprehensive Summary Statistics (Unchanged) ---
         summary_stats = {
             'total_accounts': 0, 'total_yep': 0.0, 'avg_priority_score': None, 'avg_health_score': None,
             'count_priority1': 0, 'count_priority2': 0, 'count_due_this_week': 0,
@@ -243,150 +230,97 @@ def get_strategic_accounts_data_v2():
             current_year = today.year
             end_of_this_week = today + timedelta(days=6)
 
-            # Fetch PY Revenue needed for pace % calculations
             py_revenue_map = get_previous_year_revenue(account_codes, current_year - 1, db.session)
 
+            low_pace_count = 0 # Use a separate counter to avoid double counting from the debug log
             for acc in accounts:
-                # Sum YEP
                 summary_stats['total_yep'] += acc.yep_revenue or 0.0
-
-                # Collect scores for averaging
                 if acc.enhanced_priority_score is not None: valid_priority_scores.append(acc.enhanced_priority_score)
                 if acc.health_score is not None: valid_health_scores.append(acc.health_score)
-
-                # Priority Counts
-                priority_score = acc.enhanced_priority_score or -1 # Default low if None
+                priority_score = acc.enhanced_priority_score or -1
                 if priority_score >= HIGH_PRIORITY_THRESHOLD: summary_stats['count_priority1'] += 1
                 if MED_PRIORITY_THRESHOLD <= priority_score < HIGH_PRIORITY_THRESHOLD: summary_stats['count_priority2'] += 1
-
-                # Due This Week Count
                 due_date = acc.next_expected_purchase_date
                 if due_date:
                     due_date_only = due_date.date() if isinstance(due_date, datetime) else due_date
                     if isinstance(due_date_only, date) and today <= due_date_only <= end_of_this_week:
                          summary_stats['count_due_this_week'] += 1
-
-                # Overdue Count
                 if (acc.days_overdue or 0) > 0: summary_stats['count_overdue'] += 1
-
-                # Low Health Count
                 if (acc.health_score or 101) < HEALTH_POOR_THRESHOLD: summary_stats['count_low_health'] += 1
-
-                # Pace Counts (Requires PY Revenue)
                 py_rev = py_revenue_map.get(acc.canonical_code, 0.0)
                 pace_val = acc.pace_vs_ly
                 if pace_val is not None and py_rev is not None and py_rev > 0:
                     pace_pct = (pace_val / py_rev) * 100.0
-                    if pace_pct <= PRIORITY_PACE_DECLINE_PCT_THRESHOLD: summary_stats['count_low_pace'] += 1
+                    if pace_pct <= PRIORITY_PACE_DECLINE_PCT_THRESHOLD: low_pace_count += 1
                     if pace_pct >= GROWTH_PACE_INCREASE_PCT_THRESHOLD: summary_stats['count_high_pace'] += 1
-
-                # Growth Opp Count
                 if is_growth_opportunity(acc, py_rev, today):
                     summary_stats['count_growth_opps'] += 1
-
-                # --- Logging for Low Pace Count ---
-                py_rev = py_revenue_map.get(acc.canonical_code, 0.0)
-                pace_val = acc.pace_vs_ly
-                low_pace_met_python = False # Flag to track if it met criteria here
-
-                # *** Add logging specifically for your chosen test_canonical_code ***
-                test_canonical_code = '02VA9583_NATURESOUTLET' # <<< REPLACE WITH ACTUAL CODE
-                if acc.canonical_code == test_canonical_code:
-                    logger.info(f"[PY DEBUG {acc.canonical_code}] Checking Low Pace:")
-                    logger.info(f"  pace_val: {pace_val} (Type: {type(pace_val)})")
-                    logger.info(f"  py_rev: {py_rev} (Type: {type(py_rev)})")
-                    logger.info(f"  Condition (pace_val is not None): {pace_val is not None}")
-                    logger.info(f"  Condition (py_rev is not None): {py_rev is not None}")
-                    logger.info(f"  Condition (py_rev > 0): {py_rev > 0 if py_rev is not None else 'N/A'}")
-
-                if pace_val is not None and py_rev is not None and py_rev > 0:
-                    pace_pct = (pace_val / py_rev) * 100.0
-                    threshold = PRIORITY_PACE_DECLINE_PCT_THRESHOLD # <<< Make sure this is the correct threshold variable
-                    meets_threshold = pace_pct <= threshold
-                    if acc.canonical_code == test_canonical_code:
-                        logger.info(f"  Calculated pace_pct: {pace_pct}")
-                        logger.info(f"  Threshold: {threshold}")
-                        logger.info(f"  Comparison (pace_pct <= threshold): {meets_threshold}")
-
-                    if meets_threshold:
-                        summary_stats['count_low_pace'] += 1
-                        low_pace_met_python = True # Mark that it met criteria
-                else:
-                    # Log why the conditions failed for the test account
-                    if acc.canonical_code == test_canonical_code:
-                        logger.info(f"  Skipped calculation because conditions not met.")
-
-                # Log the final result for the test account
-                if acc.canonical_code == test_canonical_code:
-                    logger.info(f"  >>> Met Low Pace Criteria (Python): {low_pace_met_python}")
-                # --- End Logging for Low Pace Count ---
-
-            # Calculate Averages
+            
+            summary_stats['count_low_pace'] = low_pace_count # Assign the final count
             if valid_priority_scores: summary_stats['avg_priority_score'] = round(sum(valid_priority_scores) / len(valid_priority_scores), 1)
             if valid_health_scores: summary_stats['avg_health_score'] = round(sum(valid_health_scores) / len(valid_health_scores), 1)
-
-            # Round Total YEP
             summary_stats['total_yep'] = round(summary_stats['total_yep'], 2)
 
-        logger.debug(f"Calculated Summary Stats: {summary_stats}")
-
-        # --- Format Response List (Include py_total_revenue) ---
+        # --- Format Response List (With NaN cleaning) ---
         output_list = []
         for acc in accounts:
-            py_rev_for_acc = py_revenue_map.get(acc.canonical_code, 0.0) # Get PY rev for this acc
-            # Safely access properties for product lists
+            py_rev_for_acc = py_revenue_map.get(acc.canonical_code, 0.0)
             carried_list = acc.carried_top_products if hasattr(acc, 'carried_top_products') else []
             missing_list = acc.missing_top_products if hasattr(acc, 'missing_top_products') else []
 
-            priority_score_value = acc.enhanced_priority_score
-
-            output_list.append({
-                # Include ALL fields needed by the DataTable AND the Context Panel
-                "id": acc.id, # Keep internal ID if useful
+            # Create the dictionary from the SQLAlchemy object
+            acc_data = {
+                "id": acc.id,
                 "canonical_code": acc.canonical_code,
-                "base_card_code": acc.base_card_code, # Include if useful for display
+                "base_card_code": acc.base_card_code,
                 "name": acc.name,
                 "distributor": acc.distributor,
                 "full_address": acc.full_address,
-                # Scores & Segments
-                "enhanced_priority_score": float(priority_score_value) if priority_score_value is not None else None,
-                "health_score": float(acc.health_score) if acc.health_score is not None else None, 
+                "enhanced_priority_score": acc.enhanced_priority_score,
+                "health_score": acc.health_score,
                 "health_category": acc.health_category,
                 "rfm_segment": acc.rfm_segment,
-                "recency_score": acc.recency_score, # May be needed for context/fallback
-                "frequency_score": acc.frequency_score, # May be needed for context/fallback
-                # Dates & Status
+                "recency_score": acc.recency_score,
+                "frequency_score": acc.frequency_score,
                 "next_expected_purchase_date": acc.next_expected_purchase_date.isoformat() if acc.next_expected_purchase_date else None,
                 "days_overdue": acc.days_overdue,
                 "last_purchase_date": acc.last_purchase_date.isoformat() if acc.last_purchase_date else None,
                 "last_purchase_amount": acc.last_purchase_amount,
                 "days_since_last_purchase": acc.days_since_last_purchase,
-                # Performance
-                "account_total": acc.account_total, # Lifetime total
+                "account_total": acc.account_total,
                 "cytd_revenue": acc.cytd_revenue,
                 "yep_revenue": acc.yep_revenue,
                 "pace_vs_ly": acc.pace_vs_ly,
-                "py_total_revenue": py_rev_for_acc, # *** INCLUDE PY REVENUE ***
-                "yoy_revenue_growth": acc.yoy_revenue_growth, # Keep if displayed
+                "py_total_revenue": py_rev_for_acc,
+                "yoy_revenue_growth": acc.yoy_revenue_growth,
                 "avg_order_amount_cytd": acc.avg_order_amount_cytd,
-                # Cadence
                 "median_interval_days": acc.median_interval_days,
                 "avg_interval_cytd": acc.avg_interval_cytd,
                 "avg_interval_py": acc.avg_interval_py,
-                # Products
                 "product_coverage_percentage": acc.product_coverage_percentage,
-                "carried_top_products": carried_list if isinstance(carried_list, list) else [], # Ensure list
-                "missing_top_products": missing_list if isinstance(missing_list, list) else [], # Ensure list
-                # Rep Info
+                "carried_top_products": carried_list if isinstance(carried_list, list) else [],
+                "missing_top_products": missing_list if isinstance(missing_list, list) else [],
                 "sales_rep": acc.sales_rep,
                 "sales_rep_name": acc.sales_rep_name,
-            })
-        # --- End Format Response List ---
+            }
+
+            # --- THIS IS THE FIX ---
+            # Create a new, clean dictionary, replacing any NaN values with None.
+            cleaned_acc_data = {}
+            for key, value in acc_data.items():
+                # Check if the value is a float and if it is NaN
+                if isinstance(value, float) and math.isnan(value):
+                    cleaned_acc_data[key] = None # Replace NaN with None for valid JSON
+                else:
+                    cleaned_acc_data[key] = value
+            # --- END FIX ---
+            
+            output_list.append(cleaned_acc_data)
 
         # --- Return Combined Data ---
         return jsonify({
-            "accounts": output_list,     # Sorted list of account objects
-            "summary_stats": summary_stats # Dictionary of calculated stats
+            "accounts": output_list,
+            "summary_stats": summary_stats
         })
 
     except Exception as e:
