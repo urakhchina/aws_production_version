@@ -99,4 +99,4 @@ analysis_reports/
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
 
-kehe_unfi_data.csv
+kehe_unfi_data.csvprod_snapshot.sql
