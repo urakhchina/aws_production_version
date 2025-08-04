@@ -303,6 +303,7 @@ class Transaction(db.Model):
     item_code = db.Column(db.String(50), nullable=True, index=True) # Store ITEM code (SKU)
     description = db.Column(db.Text) # Product description
     # Add other relevant fields from raw data if needed for analysis (e.g., ITEM code?)
+    name = db.Column(db.String(100), nullable=True)
     distributor = db.Column(db.String(100), index=True) # Maybe store distributor here?
     sales_rep = db.Column(db.String(255), index=True) # Or store rep here?
 
