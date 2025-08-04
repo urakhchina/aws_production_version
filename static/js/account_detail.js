@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const detailBaseCardCodeEl = document.getElementById('detailBaseCardCode');
     const detailFullAddressEl = document.getElementById('detailFullAddress');
     const detailSalesRepNameEl = document.getElementById('detailSalesRepName');
-    const detailDistributorNameEl = document.getElementById('detailDistributorName');
+    //const detailDistributorNameEl = document.getElementById('detailDistributorName');
     const detailPyYearLabelPerfEl = document.getElementById('detailPyYearLabelPerf');
     const detailPyTotalSalesLabelPerfEl = document.getElementById('detailPyTotalSalesLabelPerf');
     const detailPyTotalRevenuePerfEl = document.getElementById('detailPyTotalRevenuePerf');
@@ -412,6 +412,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 (getattr(pred, 'sales_rep') ? `ID: ${pred.sales_rep}` : 'N/A')
             );
         }
+        /*
         if (detailDistributorNameEl) {
             const distributors = getattr(pred, 'distributors', null);
             if (distributors && Array.isArray(distributors) && distributors.length > 0) {
@@ -420,6 +421,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 detailDistributorNameEl.textContent = getattr(pred, 'distributor', 'N/A');
             }
         }
+        */
 
         if (detailPyYearLabelPerfEl) detailPyYearLabelPerfEl.textContent = py.toString();
 
