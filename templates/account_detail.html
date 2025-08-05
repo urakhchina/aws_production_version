@@ -126,32 +126,6 @@
         @media (max-width: 991.98px) {
             
             /* --- Mobile-Only Reordering --- */
-            .chart-card .metric-card-body {
-                background-color: white;
-                border: 1px solid var(--bs-border-color);
-                border-radius: 8px;
-                padding: 1rem;
-                margin-top: 1rem;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-            }
-            
-            /* Ensure the border-top styling is overridden */
-            .chart-card .metric-card-body.mt-3.border-top.pt-3 {
-                border-top: 1px solid var(--bs-border-color) !important;
-                background-color: white;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-            }
-            
-            /* Alternative approach - target the specific revenue trend section */
-            #revenueChart + .metric-card-body {
-                background-color: white;
-                border: 1px solid var(--bs-border-color);
-                border-radius: 8px;
-                padding: 1rem;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-            }
-            
             /* This turns the main content area into a flex container */
             #accountDetailContent .row.g-4 {
                 display: flex;
@@ -164,8 +138,12 @@
             /* --- End Reordering --- */
 
             /* Make cards and sections more compact on mobile */
-            .metric-card, .chart-card, .yearly-summary-card {
+            .metric-card, .yearly-summary-card {
                 padding: 1rem;
+            }
+            
+            .chart-card {
+                padding: 1rem 1rem 1.5rem 1rem; /* top/sides reduced, bottom keeps space for trend section */
             }
             .chart-card-header, .yearly-summary-header {
                 font-size: 1rem;
