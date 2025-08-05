@@ -454,7 +454,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             let sortVal = -Infinity; // Default sort for N/A
     
                             if (pace !== null && pyRev !== null && pyRev !== undefined && pyRev > 0) {
-                                const pacePercent = (pace / pyRev) * 100;
+                                //const pacePercent = (pace / pyRev) * 100;
+                                const pacePercent = pace;
                                 sortVal = pacePercent; // Sort by actual percentage
                                 const color = pacePercent <= PACE_DECLINE_THRESHOLD ? 'text-danger' : (pacePercent >= PACE_INCREASE_THRESHOLD ? 'text-success' : 'text-dark');
                                 display = `<span class="${color}">${pacePercent >= 0 ? '+' : ''}${formatNumber(pacePercent, 1)}%</span>`;
