@@ -1902,16 +1902,40 @@ def recalculate_predictions_and_metrics():
                 yep_revenue = None
                 if cytd_revenue > 0 and not acc_cytd_trans.empty:
                     # Use the last transaction date for the CYTD revenue as the reference point
+                    '''
                     last_cytd_date = acc_cytd_trans['posting_date'].max().date()
                     # Ensure date is valid and in the current year
                     if last_cytd_date >= start_of_year_dt.date():
                         # Calculate days from start of year to the last transaction date
                         days_for_ytd_accumulation = (last_cytd_date - start_of_year_dt.date()).days + 1
                         yep_revenue = (cytd_revenue / days_for_ytd_accumulation) * 365
+                    '''
+                    days_for_ytd_accumulation = (now_dt.date() - start_of_year_dt.date()).days + 1
+                    if days_for_ytd_accumulation < 30:  # No meaningful run-rate has been established yet
+                        yep_revenue = cytd_revenue  # Set YEP equal to CYTD (i.e., no projection)
+                    else:
+                        # Otherwise, calculate the projection as intended
+                        yep_revenue = (cytd_revenue / days_for_ytd_accumulation) * 365
+
                 
                 py_hist_row_df = acc_hist_all_years_df[acc_hist_all_years_df['year'] == prev_year]
                 py_total_revenue = float(py_hist_row_df['total_revenue'].sum()) if not py_hist_row_df.empty else 0.0
-                pace_vs_ly = (yep_revenue - py_total_revenue) if yep_revenue is not None else None
+                #pace_vs_ly = (yep_revenue - py_total_revenue) if yep_revenue is not None else None
+                
+                # --- CORRECTED AND ROBUST PACE CALCULATION ---
+                if yep_revenue is not None and py_total_revenue is not None:
+                    if py_total_revenue > 0:
+                        # Calculates the percentage and assigns it to pace_vs_ly
+                        pace_vs_ly = ((yep_revenue - py_total_revenue) / py_total_revenue) * 100
+                    elif yep_revenue > 0:
+                        # Handles "New Growth" case
+                        pace_vs_ly = None 
+                    else:
+                        # Handles 0 vs 0 case
+                        pace_vs_ly = 0.0
+                else:
+                    # Handles cases where pace can't be calculated
+                    pace_vs_ly = None
                 
                 account_total = acc_hist_all_years_df['total_revenue'].sum()
                 purchase_frequency = acc_hist_all_years_df['transaction_count'].sum()

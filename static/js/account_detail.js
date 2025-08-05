@@ -487,7 +487,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const pyRevNumeric = parseFloat(pyRevenueValue);
             if (!isNaN(pyRevNumeric)) {
                 if (pyRevNumeric > 0) {
-                    const pacePercent = (parseFloat(paceVsLyValue) / pyRevNumeric) * 100;
+                    //const pacePercent = (parseFloat(paceVsLyValue) / pyRevNumeric) * 100;
+                    const pacePercent = (parseFloat(paceVsLyValue));
                     pacePctText = `${pacePercent >= 0 ? '+' : ''}${formatValue(pacePercent, 1)}%`;
                 } else if (getattr(pred, 'yep_revenue', 0) > 0) {
                     pacePctText = 'New Growth';

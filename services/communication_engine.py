@@ -315,7 +315,9 @@ def send_weekly_digest_email_for_rep(rep_id, rep_name, rep_email):
             summary_table_html += "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px;'>"
             summary_table_html += "<thead style='background-color: #f2f2f2;'>"
             header_needed_col = "Needed for Growth Target" if not is_negative_pacing_week else "Needed for +1% Target"
-            summary_table_html += f"<tr><th>#</th><th>Account Name</th><th>Pace vs LY</th><th>YEP</th><th>{header_needed_col}</th><th>Suggested Next Order</th></tr>"            
+            # --- MODIFICATION START ---
+            summary_table_html += f"<tr><th>#</th><th>Account Name</th><th>Card Code</th><th>Pace vs LY</th><th>YEP</th><th>{header_needed_col}</th><th>Suggested Next Order</th></tr>"
+            # --- MODIFICATION END ---
             summary_table_html += "</thead><tbody>"
             
             for i, acc_data in enumerate(email_accounts_for_week):
@@ -323,6 +325,9 @@ def send_weekly_digest_email_for_rep(rep_id, rep_name, rep_email):
                 summary_table_html += f"<tr>"
                 summary_table_html += f"<td style='text-align: center;'>{i+1}</td>"
                 summary_table_html += f"<td><a href='{account_detail_link}' style='color: #007bff; text-decoration: none;'>{acc_data['name']}</a></td>"
+                # --- MODIFICATION START ---
+                summary_table_html += f"<td style='text-align: left;'>{acc_data['base_card_code']}</td>"
+                # --- MODIFICATION END ---
                 summary_table_html += f"<td style='text-align: right;'>{acc_data['pace_display']}</td>"
                 summary_table_html += f"<td style='text-align: right;'>{acc_data['yep_rev_short']}</td>"
                 summary_table_html += f"<td style='text-align: right;'>{acc_data['amount_needed_str']}</td>"
@@ -610,6 +615,7 @@ if __name__ == "__main__":
     print("\n--- Standalone Pacing Digest Test Finished ---")
 '''
 
+'''
 if __name__ == "__main__":
     print("--- Running Communication Engine Standalone Test (New Pacing Digest) ---")
 
@@ -783,4 +789,132 @@ if __name__ == "__main__":
     logger.info("--- Standalone Pacing Digest Test Finished ---")
     print("\n--- Standalone Pacing Digest Test Finished ---")
 
+'''
+
+if __name__ == "__main__":
+    print("--- Running Communication Engine Standalone Test: Send all 4 weekly emails ---")
+
+    # --- Basic Logging Setup for Standalone Test ---
+    log_level = logging.DEBUG 
+    log_formatter = logging.Formatter('%(asctime)s - %(name)s [%(levelname)s] %(filename)s:%(lineno)d - %(message)s')
+    console_handler = logging.StreamHandler(sys.stdout) 
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(log_formatter)
+    root_logger = logging.getLogger()
+    if not root_logger.hasHandlers(): 
+        root_logger.addHandler(console_handler)
+    root_logger.setLevel(log_level) 
+    logger.setLevel(log_level) 
+    if not logger.hasHandlers(): 
+        logger.addHandler(console_handler)
+    logger.info("Configured loggers for standalone test.")
+    # --- End Logging Setup ---
+
+    try:
+        from flask import Flask
+        import os 
+    except ImportError as e:
+        print(f"ERROR: Flask or os module not found: {e}.")
+        exit(1)
+
+    app = Flask(__name__)
+    try:
+        db_uri_from_env = os.environ.get('SQLALCHEMY_DATABASE_URI')
+        if db_uri_from_env:
+            app.config['SQLALCHEMY_DATABASE_URI'] = db_uri_from_env
+            logger.info(f"Using DB URI from ENVIRONMENT VARIABLE.")
+        elif hasattr(config, 'SQLALCHEMY_DATABASE_URI') and getattr(config, 'SQLALCHEMY_DATABASE_URI'):
+            app.config['SQLALCHEMY_DATABASE_URI'] = getattr(config, 'SQLALCHEMY_DATABASE_URI')
+            logger.info(f"Using DB URI from config.py.")
+        else:
+            logger.error("SQLALCHEMY_DATABASE_URI not found in config.py and not set as ENV variable.")
+            print("ERROR: SQLALCHEMY_DATABASE_URI not found.")
+            exit(1)
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    except Exception as config_err:
+        logger.error(f"Error loading Flask app configuration: {config_err}", exc_info=True)
+        print(f"ERROR loading Flask app configuration: {config_err}")
+        exit(1)
+
+    try:
+        db.init_app(app) 
+        logger.info("Database initialized with Flask app for standalone test.")
+        print("Database initialized with Flask app.")
+    except Exception as db_err:
+        logger.error(f"Error initializing database with Flask app: {db_err}", exc_info=True)
+        print(f"ERROR initializing database with Flask app: {db_err}")
+        exit(1)
+
+    # --- TEST CONFIGURATION ---
+    TEST_RECIPIENT_EMAIL = "natasha@irwinnaturals.com"
+    TEST_REP_NAME_FOR_DATA = "Mariano Cruz"
+    WEEK_TEST_DAYS = {1: 3, 2: 10, 3: 17, 4: 24} # Day of the month to simulate for each week
+
+    effective_test_mode = getattr(config, 'TEST_MODE', True)
+    print("\n" + "="*60)
+    print(f"TEST MODE: {'ON (Printing Emails to Console)' if effective_test_mode else 'OFF (Attempting Real SMTP Send)'}")
+    if effective_test_mode:
+        print("!!! IMPORTANT: To send actual emails, set TEST_MODE = False in config.py")
+    print(f"Test emails will be sent to: {TEST_RECIPIENT_EMAIL}")
+    print(f"Email content will be generated using data for: {TEST_REP_NAME_FOR_DATA}")
+    print("="*60 + "\n")
     
+    with app.app_context():
+        logger.info("App context established for testing.")
+        
+        # --- Find the Rep ID for the test data ---
+        test_rep_id = None
+        try:
+            stmt = select(AccountPrediction.sales_rep).where(AccountPrediction.sales_rep_name == TEST_REP_NAME_FOR_DATA).limit(1)
+            result = db.session.execute(stmt).scalar_one_or_none()
+            if result:
+                test_rep_id = result
+                logger.info(f"Found Rep ID for {TEST_REP_NAME_FOR_DATA}: {test_rep_id}")
+            else:
+                logger.error(f"Could not find Rep ID for '{TEST_REP_NAME_FOR_DATA}'. Cannot proceed.")
+                print(f"ERROR: Could not find Rep ID for '{TEST_REP_NAME_FOR_DATA}'. Please check the name and database.")
+                exit(1)
+        except Exception as e_fetch_rep:
+            logger.error(f"DB error finding Rep ID for {TEST_REP_NAME_FOR_DATA}: {e_fetch_rep}", exc_info=True)
+            exit(1)
+
+        original_datetime_class = datetime.datetime
+        
+        for week_num, day_to_simulate in WEEK_TEST_DAYS.items():
+            print(f"\n--- PROCESSING WEEK {week_num} (simulating day {day_to_simulate}) ---")
+            
+            # --- Mock datetime.datetime.now() for this specific week ---
+            class MockDateTime(datetime.datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    current_real_year = original_datetime_class.now().year
+                    # Simulate a date in the current month to make the email text relevant
+                    current_real_month = original_datetime_class.now().month
+                    return original_datetime_class(current_real_year, current_real_month, day_to_simulate, tzinfo=tz)
+            
+            datetime.datetime = MockDateTime
+            logger.info(f"MOCKING datetime.now() to: {datetime.datetime.now().date()} for Week {week_num} test.")
+
+            try:
+                success = send_weekly_digest_email_for_rep(
+                    test_rep_id, 
+                    TEST_REP_NAME_FOR_DATA, 
+                    TEST_RECIPIENT_EMAIL
+                )
+                if success:
+                    print(f"✅ SUCCESS: Week {week_num} email for {TEST_REP_NAME_FOR_DATA} was generated and sent/printed.")
+                else:
+                    print(f"❌ FAILED: Week {week_num} email generation failed. Check logs for details.")
+            except Exception as e_test_run:
+                logger.error(f"Exception during Week {week_num} test for {TEST_REP_NAME_FOR_DATA}: {e_test_run}", exc_info=True)
+                print(f"❌ EXCEPTION on Week {week_num}. See logs for details.")
+
+            # Pause between sending emails
+            if not effective_test_mode:
+                print("Pausing for 5 seconds before next email...")
+                time.sleep(5)
+            
+        # --- Restore the original datetime class ---
+        datetime.datetime = original_datetime_class
+        logger.info("Restored original datetime.datetime class.")
+        print("\n--- All weekly tests complete. ---")
