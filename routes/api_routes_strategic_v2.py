@@ -222,7 +222,20 @@ def get_strategic_accounts_data_v2():
         }
 
         if accounts:
+            # --- Calculate Portfolio Totals First ---
+            # Sum the relevant fields from all account objects returned by the query.
+            # Use a generator expression for efficiency. Default to 0 if a value is None.
+            total_py_revenue_calc = sum(acc.py_total_revenue or 0 for acc in accounts)
+            total_cytd_revenue_calc = sum(acc.cytd_revenue or 0 for acc in accounts)
+            total_yep_calc = sum(acc.yep_revenue or 0 for acc in accounts)
+
+            # --- Populate the summary_stats dictionary with ALL required fields ---
             summary_stats['total_accounts'] = len(accounts)
+            summary_stats['total_py_revenue'] = total_py_revenue_calc
+            summary_stats['total_cytd_revenue'] = total_cytd_revenue_calc
+            summary_stats['total_yep'] = round(total_yep_calc, 2)
+            
+            # --- Now, calculate the rest of the summary stats (averages and counts) ---
             valid_priority_scores = []
             valid_health_scores = []
             account_codes = [acc.canonical_code for acc in accounts]
@@ -230,36 +243,41 @@ def get_strategic_accounts_data_v2():
             current_year = today.year
             end_of_this_week = today + timedelta(days=6)
 
+            # We still need py_revenue_map for individual pace checks
             py_revenue_map = get_previous_year_revenue(account_codes, current_year - 1, db.session)
 
-            low_pace_count = 0 # Use a separate counter to avoid double counting from the debug log
+            low_pace_count = 0
             for acc in accounts:
-                summary_stats['total_yep'] += acc.yep_revenue or 0.0
+                # The loop is now only for calculating counts and averages, not sums
                 if acc.enhanced_priority_score is not None: valid_priority_scores.append(acc.enhanced_priority_score)
                 if acc.health_score is not None: valid_health_scores.append(acc.health_score)
+                
                 priority_score = acc.enhanced_priority_score or -1
                 if priority_score >= HIGH_PRIORITY_THRESHOLD: summary_stats['count_priority1'] += 1
                 if MED_PRIORITY_THRESHOLD <= priority_score < HIGH_PRIORITY_THRESHOLD: summary_stats['count_priority2'] += 1
+                
                 due_date = acc.next_expected_purchase_date
                 if due_date:
                     due_date_only = due_date.date() if isinstance(due_date, datetime) else due_date
                     if isinstance(due_date_only, date) and today <= due_date_only <= end_of_this_week:
                          summary_stats['count_due_this_week'] += 1
+                
                 if (acc.days_overdue or 0) > 0: summary_stats['count_overdue'] += 1
                 if (acc.health_score or 101) < HEALTH_POOR_THRESHOLD: summary_stats['count_low_health'] += 1
+                
                 py_rev = py_revenue_map.get(acc.canonical_code, 0.0)
                 pace_val = acc.pace_vs_ly
                 if pace_val is not None and py_rev is not None and py_rev > 0:
                     pace_pct = (pace_val / py_rev) * 100.0
                     if pace_pct <= PRIORITY_PACE_DECLINE_PCT_THRESHOLD: low_pace_count += 1
                     if pace_pct >= GROWTH_PACE_INCREASE_PCT_THRESHOLD: summary_stats['count_high_pace'] += 1
+                
                 if is_growth_opportunity(acc, py_rev, today):
                     summary_stats['count_growth_opps'] += 1
             
-            summary_stats['count_low_pace'] = low_pace_count # Assign the final count
+            summary_stats['count_low_pace'] = low_pace_count
             if valid_priority_scores: summary_stats['avg_priority_score'] = round(sum(valid_priority_scores) / len(valid_priority_scores), 1)
             if valid_health_scores: summary_stats['avg_health_score'] = round(sum(valid_health_scores) / len(valid_health_scores), 1)
-            summary_stats['total_yep'] = round(summary_stats['total_yep'], 2)
 
         # --- Format Response List (With NaN cleaning) ---
         output_list = []

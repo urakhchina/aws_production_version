@@ -122,28 +122,34 @@
     <!-- 1. Daily Briefing / Snapshot Row -->
     <div class="row g-2 mb-4"> <!-- Use smaller gutters -->
         <!-- KPI Cards -->
-        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2"> <!-- Adjusted grid for better spacing -->
+        <div class="col-xl col-lg-4 col-md-6 col-sm-6 mb-2">
             <div class="kpi-card-sm h-100">
                 <div class="kpi-label"><i class="fas fa-users text-secondary"></i> Total Accounts</div>
                 <div id="kpiTotalAccounts" class="kpi-value text-secondary">-</div>
             </div>
         </div>
-        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2">
+        <div class="col-xl col-lg-4 col-md-6 col-sm-6 mb-2">
+            <div class="kpi-card-sm h-100">
+                <div class="kpi-label"><i class="fas fa-calendar-alt text-secondary"></i> <span id="kpiPyLabel">Previous Year</span> Sales</div>
+                <div id="kpiPySales" class="kpi-value text-secondary">-</div>
+            </div>
+        </div>
+        <div class="col-xl col-lg-4 col-md-6 col-sm-6 mb-2">
+            <div class="kpi-card-sm h-100">
+                <div class="kpi-label"><i class="fas fa-calendar-day text-info"></i> <span id="kpiCyLabel">Current Year</span> YTD</div>
+                <div id="kpiCytdSales" class="kpi-value text-info">-</div>
+            </div>
+        </div>
+        <div class="col-xl col-lg-6 col-md-6 col-sm-6 mb-2">
             <div class="kpi-card-sm h-100">
                 <div class="kpi-label"><i class="fas fa-dollar-sign text-success"></i> Portfolio YEP</div>
-                <div id="kpiTotalValue" class="kpi-value text-success">-</div>
+                <div id="kpiYepValue" class="kpi-value text-success">-</div>
             </div>
         </div>
-        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2">
+        <div class="col-xl col-lg-6 col-md-6 col-sm-6 mb-2">
             <div class="kpi-card-sm h-100">
-                <div class="kpi-label"><i class="fas fa-tachometer-alt text-info"></i> Avg. Priority Score</div>
-                <div id="kpiAvgPriority" class="kpi-value text-info">-</div>
-            </div>
-        </div>
-        <div class="col-xl col-lg-3 col-md-6 col-sm-6 mb-2">
-            <div class="kpi-card-sm h-100">
-                <div class="kpi-label"><i class="fas fa-heartbeat text-primary"></i> Avg. Health Score</div>
-                <div id="kpiAvgHealth" class="kpi-value text-primary">-</div>
+                <div class="kpi-label"><i class="fas fa-chart-line text-primary"></i> YEP vs PY %</div>
+                <div id="kpiPaceVsPy" class="kpi-value text-primary">-</div>
             </div>
         </div>
 

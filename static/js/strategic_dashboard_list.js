@@ -60,9 +60,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // KPIs & Quick Filters
     const kpiTotalAccountsEl = document.getElementById('kpiTotalAccounts');
-    const kpiTotalValueEl = document.getElementById('kpiTotalValue');
-    const kpiAvgPriorityEl = document.getElementById('kpiAvgPriority');
-    const kpiAvgHealthEl = document.getElementById('kpiAvgHealth');
+    const kpiPyLabelEl = document.getElementById('kpiPyLabel');
+    const kpiPySalesEl = document.getElementById('kpiPySales');
+    const kpiCyLabelEl = document.getElementById('kpiCyLabel');
+    const kpiCytdSalesEl = document.getElementById('kpiCytdSales');
+    const kpiYepValueEl = document.getElementById('kpiYepValue');
+    const kpiPaceVsPyEl = document.getElementById('kpiPaceVsPy');
+
     const quickFilterContainer = document.querySelector('.quick-filters');
     // Snapshot counts spans
     const countPriority1El = document.getElementById('countPriority1');
@@ -284,11 +288,46 @@ document.addEventListener('DOMContentLoaded', function () {
             clearKpiSummary();
             return;
         }
-        // (Keep existing logic - updates KPIs and Quick Filter counts)
+
         if (kpiTotalAccountsEl) kpiTotalAccountsEl.textContent = stats.total_accounts ?? '-';
-        if (kpiTotalValueEl) kpiTotalValueEl.textContent = formatCurrency(stats.total_yep ?? 0);
-        if (kpiAvgPriorityEl) kpiAvgPriorityEl.textContent = formatNumber(stats.avg_priority_score, 1) ?? '-';
-        if (kpiAvgHealthEl) kpiAvgHealthEl.textContent = formatNumber(stats.avg_health_score, 1) ?? '-';
+
+        // --- 1. Set Dynamic Year Labels ---
+        const currentYear = new Date().getFullYear();
+        const prevYear = currentYear - 1;
+        if (kpiPyLabelEl) kpiPyLabelEl.textContent = `${prevYear}`;
+        if (kpiCyLabelEl) kpiCyLabelEl.textContent = `${currentYear}`;
+
+        // --- 2. Get Values from API data ---
+        // Assumes the API provides these keys in the summary_stats object
+        const pySales = stats.total_py_revenue ?? 0;
+        const cytdSales = stats.total_cytd_revenue ?? 0;
+        const yepValue = stats.total_yep ?? 0;
+
+        // --- 3. Calculate Pace Percentage ---
+        let pacePercent = null;
+        if (pySales > 0) {
+            pacePercent = ((yepValue - pySales) / pySales) * 100;
+        }
+
+        // --- 4. Populate the KPI Cards ---
+        // Use the new formatCurrencyExact function for precision
+        if (kpiPySalesEl) kpiPySalesEl.textContent = formatCurrencyExact(pySales);
+        if (kpiCytdSalesEl) kpiCytdSalesEl.textContent = formatCurrencyExact(cytdSales);
+        if (kpiYepValueEl) kpiYepValueEl.textContent = formatCurrencyExact(yepValue);
+        
+        // Format and display the percentage
+        if (kpiPaceVsPyEl) {
+            if (pacePercent !== null) {
+                const paceColor = pacePercent >= 0 ? 'text-success' : 'text-danger';
+                kpiPaceVsPyEl.innerHTML = `<span class="${paceColor}">${pacePercent >= 0 ? '+' : ''}${pacePercent.toFixed(1)}%</span>`;
+            } else if (yepValue > 0) {
+                kpiPaceVsPyEl.innerHTML = `<span class="text-success">New Growth</span>`;
+            } else {
+                kpiPaceVsPyEl.textContent = '-';
+            }
+        }
+        
+        // (The logic for the quick filter counts below remains the same)
         if (countPriority1El) countPriority1El.textContent = stats.count_priority1 ?? 0;
         if (countPriority2El) countPriority2El.textContent = stats.count_priority2 ?? 0;
         if (countDueThisWeekEl) countDueThisWeekEl.textContent = stats.count_due_this_week ?? 0;
@@ -300,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (countAllEl) countAllEl.textContent = stats.total_accounts ?? 0;
 
         // Update Charts based on the full dataset received for this filter set
-        aggregateAndDrawCharts(allAccountData); // Pass the full data
+        aggregateAndDrawCharts(allAccountData);
     }
 
     function aggregateAndDrawCharts(accounts) {
@@ -1415,11 +1454,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function clearKpiSummary() {
         console.log("Clearing KPI Summary");
         
+
         // Reset KPI elements
         if (kpiTotalAccountsEl) kpiTotalAccountsEl.textContent = '-';
-        if (kpiTotalValueEl) kpiTotalValueEl.textContent = '-';
-        if (kpiAvgPriorityEl) kpiAvgPriorityEl.textContent = '-';
-        if (kpiAvgHealthEl) kpiAvgHealthEl.textContent = '-';
+        if (kpiPyLabelEl) kpiPyLabelEl.textContent = 'Prev Year';
+        if (kpiCyLabelEl) kpiCyLabelEl.textContent = 'Curr Year';
+        if (kpiPySalesEl) kpiPySalesEl.textContent = '-';
+        if (kpiCytdSalesEl) kpiCytdSalesEl.textContent = '-';
+        if (kpiYepValueEl) kpiYepValueEl.textContent = '-';
+        if (kpiPaceVsPyEl) kpiPaceVsPyEl.textContent = '-';
         
         // Reset counter elements
         if (countPriority1El) countPriority1El.textContent = '0';

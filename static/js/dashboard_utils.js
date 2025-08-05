@@ -72,6 +72,29 @@ function formatCurrency(value, digits = 0) {
 }
 
 /**
+* Formats a number as currency with exact precision to two decimal places.
+* @param {*} value - The numeric value to format.
+* @returns {string} Formatted currency string (e.g., $1,234.56) or '$--'.
+*/
+function formatCurrencyExact(value) {
+   if (value === null || value === undefined) return '$--';
+   const num = parseFloat(value);
+   if (isNaN(num)) return '$--';
+
+   try {
+       return num.toLocaleString('en-US', {
+           style: 'currency',
+           currency: 'USD',
+           minimumFractionDigits: 2,
+           maximumFractionDigits: 2
+       });
+   } catch(e) {
+       console.error("formatCurrencyExact failed:", e);
+       return `$${num.toFixed(2)}`; // Fallback
+   }
+}
+
+/**
  * Formats an ISO date string or Date object into MM/DD or MM/DD/YYYY.
  * @param {string|Date|null|undefined} dateString - The date input.
  * @param {'long'|'short'} [format='long'] - 'long' for MM/DD/YYYY, 'short' for MM/DD.
