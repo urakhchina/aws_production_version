@@ -119,50 +119,67 @@
 
                 /* --- START OF NEW MOBILE OPTIMIZATION CSS --- */
         /* Target tablets and phones */
-        @media (max-width: 768px) {
+        @media (max-width: 991.98px) {
             
+            /* --- Mobile-Only Reordering --- */
+            /* This turns the main content area into a flex container */
+            #accountDetailContent .row.g-4 {
+                display: flex;
+                flex-direction: column;
+            }
+            /* Move the Growth Engine (order: 2) to appear before the charts (order: 1) */
+            #accountDetailContent .col-lg-8 { order: 2; }
+            #accountDetailContent .col-lg-4 { order: 1; }
+            /* --- End Reordering --- */
+
             /* Make cards and sections more compact on mobile */
             .metric-card, .chart-card, .yearly-summary-card {
                 padding: 1rem;
             }
-
             .chart-card-header, .yearly-summary-header {
-                font-size: 1rem; /* Slightly smaller header text */
+                font-size: 1rem;
             }
-
-            /* --- Fix for "Product Purchase History by Quarter" --- */
             #productHistoryContent .row {
-                display: block; /* Override the flexbox row behavior */
+                display: block;
             }
-
             #productHistoryContent .col-md-6,
             #productHistoryContent .col-lg-3 {
-                width: 100%; /* Ensure each quarter takes full width */
-                margin-bottom: 1rem !important; /* Add space between quarters */
-                padding: 0 !important; /* Reset padding */
+                width: 100%;
+                margin-bottom: 1rem !important;
+                padding: 0 !important;
             }
-
             #productHistoryContent .metric-card {
-                margin-bottom: 0; /* Remove double margin */
+                margin-bottom: 0;
             }
             
-            #productHistoryContent {
-                max-height: 500px; /* Give it a fixed, scrollable height */
-                overflow-y: auto;  /* Ensure it has a scrollbar */
+            /* --- Non-scrollable Quarterly Metrics Fix --- */
+            #productHistoryContent .metric-card {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
             }
+            #productHistoryContent .product-list-area {
+                flex-grow: 1; /* Allow the list to grow */
+                max-height: 250px; /* But constrain its height */
+                overflow-y: auto; /* Make ONLY the product list scrollable */
+            }
+            #productHistoryContent .quarter-metrics-summary {
+                flex-shrink: 0; /* Prevent the metrics summary from shrinking */
+            }
+            /* --- End Fix --- */
 
-            /* --- Fix for Wide Tables --- */
+
             #yearlyProductSummaryTable td, 
             #yearlyProductSummaryTable th, 
             #rollingSkuAnalysisTable td, 
             #rollingSkuAnalysisTable th {
-                font-size: 0.75rem; /* Smaller font in tables */
-                padding: 0.4rem;  /* Tighter padding */
-                white-space: nowrap; /* Prevent headers and data from wrapping */
+                font-size: 0.75rem;
+                padding: 0.4rem;
+                white-space: nowrap;
             }
 
             #quarterlyTabsContent .metric-card {
-                border-radius: 0; /* Remove rounded corners inside tabs */
+                border-radius: 0;
                 border-top: none;
             }
         }

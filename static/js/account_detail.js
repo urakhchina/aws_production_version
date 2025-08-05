@@ -841,7 +841,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="product-list-area p-2" style="max-height: 250px; overflow-y: auto; border-bottom: 1px solid var(--bs-border-color);">
                     ${productListHtml}
                 </div>
-                <div class="quarterly-summary-metrics p-2 mt-2" style="font-size: 0.75rem; line-height: 1.5;">
+                <div class="quarterly-summary-metrics quarter-metrics-summary p-2 mt-2" style="font-size: 0.75rem; line-height: 1.5;">
                     ${metricsHtml}
                 </div>
             `;
