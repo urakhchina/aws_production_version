@@ -44,6 +44,9 @@
             margin-bottom: 0.75rem;
             color: var(--theme-text);
         }
+        .chart-card > .metric-card-body {
+            flex-shrink: 0; /* Prevents the text area from shrinking */
+        }
         .metric-card-body .metric-value-small { font-size: 0.9rem; margin-bottom: 0.25rem;}
         .chart-card {
             background-color: var(--theme-card-bg);
@@ -52,6 +55,8 @@
             padding: 1.5rem;
             margin-bottom: 1.5rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            display: flex;          /* <-- ADD THIS LINE BACK */
+            flex-direction: column; /* <-- ADD THIS LINE BACK */
         }
         .chart-card-header {
              font-size: 1.1rem; font-weight: 600; color: var(--theme-green-dark);
@@ -60,10 +65,10 @@
         }
         .chart-canvas-container {
             position: relative;
-            min-height: 300px;
-            height: 320px;
             width: 100%;
+            flex-grow: 1; /* <-- This tells the container to take up available space */
         }
+        
         .chart-loading, .chart-error {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; color: var(--theme-text-muted); font-style: italic;
