@@ -121,6 +121,51 @@
         /* +++ NEW CSS FOR CLICKABLE MODAL +++ */
         #purchaseDetailModalBody { max-height: 60vh; overflow-y: auto; }
         #purchaseDetailModalBody table { width: 100%; font-size: 0.9rem; }
+
+                /* --- START OF NEW MOBILE OPTIMIZATION CSS --- */
+        /* Target tablets and phones */
+        @media (max-width: 768px) {
+            
+            /* Make cards and sections more compact on mobile */
+            .metric-card, .chart-card, .yearly-summary-card {
+                padding: 1rem;
+            }
+
+            .chart-card-header, .yearly-summary-header {
+                font-size: 1rem; /* Slightly smaller header text */
+            }
+
+            /* --- Fix for "Product Purchase History by Quarter" --- */
+            #productHistoryContent .row {
+                display: block; /* Override the flexbox row behavior */
+            }
+
+            #productHistoryContent .col-md-6,
+            #productHistoryContent .col-lg-3 {
+                width: 100%; /* Ensure each quarter takes full width */
+                margin-bottom: 1rem !important; /* Add space between quarters */
+                padding: 0 !important; /* Reset padding */
+            }
+
+            #productHistoryContent .metric-card {
+                margin-bottom: 0; /* Remove double margin */
+            }
+            
+            #productHistoryContent .product-list-area {
+                max-height: 200px; /* Reduce max height on mobile */
+            }
+
+            /* --- Fix for Wide Tables --- */
+            #yearlyProductSummaryTable td, 
+            #yearlyProductSummaryTable th, 
+            #rollingSkuAnalysisTable td, 
+            #rollingSkuAnalysisTable th {
+                font-size: 0.75rem; /* Smaller font in tables */
+                padding: 0.4rem;  /* Tighter padding */
+                white-space: nowrap; /* Prevent headers and data from wrapping */
+            }
+        }
+
     </style>
 {% endblock %}
 
