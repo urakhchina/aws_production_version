@@ -53,10 +53,6 @@
             margin-bottom: 1.5rem;
             min-height: 420px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            z-index: 1;
         }
         .chart-card-header {
              font-size: 1.1rem; font-weight: 600; color: var(--theme-green-dark);
@@ -65,7 +61,6 @@
         }
         .chart-canvas-container {
             position: relative;
-            flex-grow: 1;
             min-height: 300px;
             height: 320px;
             width: 100%;
@@ -151,8 +146,9 @@
                 margin-bottom: 0; /* Remove double margin */
             }
             
-            #productHistoryContent .product-list-area {
-                max-height: 200px; /* Reduce max height on mobile */
+            #productHistoryContent {
+                max-height: 500px; /* Give it a fixed, scrollable height */
+                overflow-y: auto;  /* Ensure it has a scrollbar */
             }
 
             /* --- Fix for Wide Tables --- */
