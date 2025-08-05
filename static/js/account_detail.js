@@ -776,72 +776,91 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function renderProductHistoryForYear(year, allYearsData) {
+    function renderProductHistoryForYear(year, allYearsData) { 
         if (!productHistoryContentEl) { return; }
-        if(productHistoryLoadingEl) showLoading(productHistoryLoadingEl, true);
-        if(productHistoryErrorEl) hideError(productHistoryErrorEl);
-        productHistoryContentEl.innerHTML = '';
-
-        if (!year || !allYearsData || !allYearsData[year]) {
-            productHistoryContentEl.innerHTML = `<p class="text-muted text-center mt-3">No detailed product data available for ${year}.</p>`;
-            if(productHistoryLoadingEl) showLoading(productHistoryLoadingEl, false);
-            return;
+        if(productHistoryLoadingEl) showLoading(productHistoryLoadingEl, true); 
+        if(productHistoryErrorEl) hideError(productHistoryErrorEl); 
+        productHistoryContentEl.innerHTML = ''; 
+        
+        if (!year || !allYearsData || !allYearsData[year]) { 
+            productHistoryContentEl.innerHTML = `<p class="text-muted text-center mt-3">No detailed product data available for ${year}.</p>`; 
+            if(productHistoryLoadingEl) showLoading(productHistoryLoadingEl, false); 
+            return; 
         }
 
-        const yearDataByQuarter = allYearsData[year];
-        const quarters = ["Q1", "Q2", "Q3", "Q4"];
-        let contentHtml = '<div class="row g-3">';
+        const yearDataByQuarter = allYearsData[year]; 
+        const quarters = ["Q1", "Q2", "Q3", "Q4"]; 
         let hasAnyDataForSelectedYearOverall = false;
 
-        quarters.forEach(qtrKey => {
-            const quarterDetail = yearDataByQuarter ? yearDataByQuarter[qtrKey] : null;
-            let productList = (quarterDetail && quarterDetail.products) ? [...quarterDetail.products] : [];
+        // --- HTML for Mobile Tab Navigation ---
+        let mobileTabsHtml = '<div class="d-lg-none"><ul class="nav nav-tabs nav-fill" id="quarterlyTabs" role="tablist">';
+        // --- HTML for Desktop Grid ---
+        let desktopGridHtml = '<div class="d-none d-lg-block"><div class="row g-3">';
+        // --- HTML for Tab Content (used by mobile) ---
+        let tabContentHtml = '<div class="d-lg-none"><div class="tab-content" id="quarterlyTabsContent">';
+
+        quarters.forEach((qtrKey, index) => {
+            const quarterDetail = yearDataByQuarter ? yearDataByQuarter[qtrKey] : null; 
+            let productList = (quarterDetail && quarterDetail.products) ? [...quarterDetail.products].sort((a, b) => (b.revenue || 0) - (a.revenue || 0)) : []; 
             const metrics = (quarterDetail && quarterDetail.metrics) ? quarterDetail.metrics : {};
+            
+            let quarterContentHtml = ''; // Build the content for one quarter
 
-            contentHtml += `<div class="col-md-6 col-lg-3 mb-3 d-flex flex-column"><div class="metric-card h-100"><div class="metric-card-header">${qtrKey} ${year}</div><div class="product-list-area p-2" style="max-height: 250px; overflow-y: auto; flex-grow: 1; border-bottom: 1px solid var(--bs-border-color);">`;
-
+            // Build the product list for the quarter
             if (productList.length > 0) {
                 hasAnyDataForSelectedYearOverall = true;
-                productList.sort((a, b) => { const getCategory = (p) => { if (p.status_in_qtr === "Newly Added this Qtr (vs Prev Qtr)") return 0; const revChange = p.qoq_rev_pct_change; const qtyChange = p.qoq_qty_pct_change; if (revChange !== null && revChange < -5) return 1; if (revChange !== null && revChange > 5) return 2; if (qtyChange !== null && qtyChange < -5 && (revChange === null || (revChange >= -5 && revChange <=5) )) return 1; if (qtyChange !== null && qtyChange > 5 && (revChange === null || (revChange >= -5 && revChange <=5) )) return 2; if ((revChange === null && (p.revenue || 0) > 0) || (qtyChange === null && (p.quantity || 0) > 0) ) return 2; return 3; }; const categoryA = getCategory(a); const categoryB = getCategory(b); if (categoryA !== categoryB) { return categoryA - categoryB; } if (categoryA === 1) { return (a.qoq_rev_pct_change ?? a.qoq_qty_pct_change ?? 1000) - (b.qoq_rev_pct_change ?? b.qoq_qty_pct_change ?? 1000); } if (categoryA === 2) {  const aIsNewValue = (a.qoq_rev_pct_change === null && (a.revenue||0) > 0) || (a.qoq_qty_pct_change === null && (a.quantity||0) > 0); const bIsNewValue = (b.qoq_rev_pct_change === null && (b.revenue||0) > 0) || (b.qoq_qty_pct_change === null && (b.quantity||0) > 0); if (aIsNewValue && !bIsNewValue) return -1; if (!aIsNewValue && bIsNewValue) return 1; return (b.qoq_rev_pct_change ?? b.qoq_qty_pct_change ?? -1000) - (a.qoq_rev_pct_change ?? a.qoq_qty_pct_change ?? -1000); } return (b.revenue || 0) - (a.revenue || 0); });
-                contentHtml += '<ul class="list-unstyled mb-0">';
-                productList.forEach(product => { const description = product.description || 'N/A'; const sku = product.sku || 'N/A'; const quantity = product.quantity || 0; const revenue = product.revenue || 0.0; const isTop30 = product.is_top_30; const statusInQtr = product.status_in_qtr || ''; const qoqQtyChange = product.qoq_qty_pct_change; const qoqRevChange = product.qoq_rev_pct_change; let itemStyle = "border-radius: 3px; margin-bottom: 0.5rem; padding: 0.3rem;"; if (isTop30) { itemStyle += "background-color: var(--theme-green-x-lighter, #e8f5e9); border-left: 4px solid var(--theme-green, #4CAF50); padding-left: 8px;"; } let statusDisplayElements = []; const formatQoQPart = (value, type, currentActualValue) => { if (value === null || value === undefined) { if (currentActualValue > 0) {  return `<span style="font-size: 0.75em; color: var(--bs-success, #198754);">(NEW ${type})</span>`; } return '';  } if (value > 0) { return `<span style="font-size: 0.75em; color: var(--bs-success, #198754);">(+${formatValue(value,1)}% ${type})</span>`; } else if (value < 0) { return `<span style="font-size: 0.75em; color: var(--bs-danger, #dc3545);">(${formatValue(value,1)}% ${type})</span>`; } else {  return `<span style="font-size: 0.75em; color: var(--bs-secondary, #6c757d);">(0% ${type})</span>`; } }; if (statusInQtr === "Newly Added this Qtr (vs Prev Qtr)") { statusDisplayElements.push(`<span class="badge bg-warning text-dark me-1" style="font-size:0.6rem;">New</span>`); } else {  let revQoQText = formatQoQPart(qoqRevChange, "Rev", revenue); let qtyQoQText = formatQoQPart(qoqQtyChange, "Qty", quantity); if (revQoQText) statusDisplayElements.push(revQoQText); if (qtyQoQText && qtyQoQText !== revQoQText) { if (!(revQoQText.includes("(NEW Rev)") && qtyQoQText.includes("(NEW Qty)"))) { statusDisplayElements.push(qtyQoQText); } else if (revQoQText && !revQoQText.includes("(NEW Rev)") && qtyQoQText.includes("(NEW Qty)")) { statusDisplayElements.push(qtyQoQText); } else if (!revQoQText && qtyQoQText) { statusDisplayElements.push(qtyQoQText); } } else if (!revQoQText && qtyQoQText) { statusDisplayElements.push(qtyQoQText); } } const finalStatusDisplay = statusDisplayElements.join(' ');
-                    contentHtml += `<li class="product-history-item" style="${itemStyle}"><div>${finalStatusDisplay}<strong class="fw-bold">${description}</strong></div><div class="small text-muted" style="font-size: 0.75rem;">SKU: ${sku}</div><div class="small" style="font-size: 0.75rem;">Qty: ${formatValue(quantity,0)} | Revenue: ${formatCurrency(revenue)}</div></li>`; });
-                contentHtml += '</ul>';
-            } else {
-                contentHtml += `<p class="text-muted small fst-italic text-center my-3">No products purchased this quarter.</p>`;
+                quarterContentHtml += '<div class="product-list-area p-2" style="max-height: 250px; overflow-y: auto; border-bottom: 1px solid var(--bs-border-color);">';
+                quarterContentHtml += '<ul class="list-unstyled mb-0">';
+                productList.forEach(product => {
+                    // ... (This complex product item HTML generation is kept the same)
+                    const description = product.description || 'N/A'; const sku = product.sku || 'N/A'; const quantity = product.quantity || 0; const revenue = product.revenue || 0.0; const isTop30 = product.is_top_30; let itemStyle = "border-radius: 3px; margin-bottom: 0.5rem; padding: 0.3rem;"; if (isTop30) { itemStyle += "background-color: var(--theme-green-x-lighter, #e8f5e9); border-left: 4px solid var(--theme-green, #4CAF50); padding-left: 8px;"; } let statusDisplayElements = []; const formatQoQPart = (value, type, currentActualValue) => { if (value === null || value === undefined) { if (currentActualValue > 0) { return `<span style="font-size: 0.75em; color: var(--bs-success, #198754);">(NEW ${type})</span>`; } return ''; } if (value > 0) { return `<span style="font-size: 0.75em; color: var(--bs-success, #198754);">(+${formatValue(value,1)}% ${type})</span>`; } else if (value < 0) { return `<span style="font-size: 0.75em; color: var(--bs-danger, #dc3545);">(${formatValue(value,1)}% ${type})</span>`; } else { return ``; } }; if (product.status_in_qtr === "Newly Added this Qtr (vs Prev Qtr)") { statusDisplayElements.push(`<span class="badge bg-warning text-dark me-1" style="font-size:0.6rem;">New</span>`); } else { let revQoQText = formatQoQPart(product.qoq_rev_pct_change, "Rev", revenue); let qtyQoQText = formatQoQPart(product.qoq_qty_pct_change, "Qty", quantity); if (revQoQText) statusDisplayElements.push(revQoQText); if (qtyQoQText && !revQoQText.includes("(NEW")) statusDisplayElements.push(qtyQoQText); } const finalStatusDisplay = statusDisplayElements.join(' ');
+                    quarterContentHtml += `<li class="product-history-item" style="${itemStyle}"><div>${finalStatusDisplay}<strong class="fw-bold">${description}</strong></div><div class="small text-muted" style="font-size: 0.75rem;">SKU: ${sku}</div><div class="small" style="font-size: 0.75rem;">Qty: ${formatValue(quantity,0)} | Revenue: ${formatCurrency(revenue)}</div></li>`;
+                });
+                quarterContentHtml += '</ul></div>';
+            } else { 
+                quarterContentHtml += `<div class="product-list-area p-2" style="border-bottom: 1px solid var(--bs-border-color);"><p class="text-muted small fst-italic text-center my-3">No products purchased this quarter.</p></div>`; 
             }
-            contentHtml += `</div><div class="quarterly-summary-metrics p-2 border-top mt-2" style="font-size: 0.75rem; line-height: 1.5;">`;
 
+            // Build the metrics section for the quarter
+            quarterContentHtml += `<div class="quarterly-summary-metrics p-2 mt-2" style="font-size: 0.75rem; line-height: 1.5;">`;
             if (metrics && Object.keys(metrics).length > 0) {
-                contentHtml += `<div class="mb-1"><strong>Total Items:</strong> ${metrics.total_items_in_quarter ?? 0}</div>`;
-                contentHtml += `<div class="mb-1"><strong>Total Revenue:</strong> ${formatCurrency(metrics.total_revenue_in_quarter ?? 0)}</div>`;
-                contentHtml += `<hr class="my-1">`;
-                const generateMetricProductListHtml = (products) => {
-                    if (!products || products.length === 0) return `<div class="text-muted small fst-italic p-1">None for this category.</div>`;
-                    let listHtml = '<ul class="list-unstyled small mt-1 mb-0 ps-2" style="font-size: 0.9em;">';
-                    products.forEach(p => {
-                        listHtml += `<li class="mb-1 p-1 border-bottom border-light">`;
-                        listHtml += `<div><strong>${p.description || 'N/A'}</strong></div>`;
-                        listHtml += `<div class="text-muted">SKU: ${p.sku || 'N/A'}</div>`;
-                        if (p.hasOwnProperty('quantity') && p.hasOwnProperty('revenue')) listHtml += `<div>Qty: ${formatValue(p.quantity, 0)} | Rev: ${formatCurrency(p.revenue)}</div>`;
-                        listHtml += `</li>`;
-                    });
-                    listHtml += '</ul>'; return listHtml;
-                };
-                contentHtml += `<details class="mb-1 product-metric-details"><summary class="fw-bold" style="cursor: pointer; color: darkgoldenrod;">Added SKUs: ${metrics.items_added_details?.length ?? 0}</summary><div class="collapsible-product-list p-1 border rounded bg-light mt-1" style="max-height: 150px; overflow-y: auto;">${generateMetricProductListHtml(metrics.items_added_details)}</div></details>`;
-                contentHtml += `<details class="mb-1 product-metric-details"><summary class="fw-bold" style="cursor: pointer; color: var(--bs-danger, #dc3545);">Dropped SKUs: ${metrics.items_dropped_details?.length ?? 0}</summary><div class="collapsible-product-list p-1 border rounded bg-light mt-1" style="max-height: 150px; overflow-y: auto;">${generateMetricProductListHtml(metrics.items_dropped_details)}</div></details>`;
-                contentHtml += `<details class="mb-1 product-metric-details"><summary class="fw-bold" style="cursor: pointer; color: var(--bs-info, #0dcaf0);">Repurchased SKUs: ${metrics.items_repurchased_count ?? 0} (Qty: ${formatValue(metrics.quantity_repurchased ?? 0, 0)})</summary><div class="collapsible-product-list p-1 border rounded bg-light mt-1" style="max-height: 150px; overflow-y: auto;">${generateMetricProductListHtml(metrics.repurchased_skus_details)}</div></details>`;
-                contentHtml += `<details class="product-metric-details"><summary class="fw-bold" style="cursor: pointer; color: var(--bs-success, #198754);">Top 30 SKUs Carried: ${metrics.count_top_30_skus_carried ?? 0} (Qty: ${formatValue(metrics.quantity_top_30_carried ?? 0, 0)})</summary><div class="collapsible-product-list p-1 border rounded bg-light mt-1" style="max-height: 150px; overflow-y: auto;">${generateMetricProductListHtml(metrics.top_30_skus_carried_details)}</div></details>`;
-            } else {
-                contentHtml += `<p class="text-muted small fst-italic">Metrics unavailable.</p>`;
+                // ... (This complex metrics HTML generation is kept the same)
+                const generateMetricProductListHtml = (products) => { if (!products || products.length === 0) return `<div class="text-muted small fst-italic p-1">None.</div>`; let listHtml = '<ul class="list-unstyled small mt-1 mb-0 ps-2" style="font-size: 0.9em;">'; products.forEach(p => { listHtml += `<li class="mb-1 p-1 border-bottom border-light"><div><strong>${p.description || 'N/A'}</strong></div><div class="text-muted">SKU: ${p.sku || 'N/A'}</div></li>`; }); listHtml += '</ul>'; return listHtml; };
+                quarterContentHtml += `<details class="mb-1 product-metric-details"><summary class="fw-bold" style="cursor: pointer;">Added SKUs: ${metrics.items_added_details?.length ?? 0}</summary><div class="collapsible-product-list p-1 border rounded bg-light mt-1" style="max-height: 150px; overflow-y: auto;">${generateMetricProductListHtml(metrics.items_added_details)}</div></details>`;
+                quarterContentHtml += `<details class="mb-1 product-metric-details"><summary class="fw-bold text-danger" style="cursor: pointer;">Dropped SKUs: ${metrics.items_dropped_details?.length ?? 0}</summary><div class="collapsible-product-list p-1 border rounded bg-light mt-1" style="max-height: 150px; overflow-y: auto;">${generateMetricProductListHtml(metrics.items_dropped_details)}</div></details>`;
+                quarterContentHtml += `<details class="mb-1 product-metric-details"><summary class="fw-bold text-success" style="cursor: pointer;">Top 30 SKUs Carried: ${metrics.count_top_30_skus_carried ?? 0}</summary><div class="collapsible-product-list p-1 border rounded bg-light mt-1" style="max-height: 150px; overflow-y: auto;">${generateMetricProductListHtml(metrics.top_30_skus_carried_details)}</div></details>`;
+            } else { 
+                quarterContentHtml += `<p class="text-muted small fst-italic">Metrics unavailable.</p>`; 
             }
-            contentHtml += `</div></div></div>`;
+            quarterContentHtml += `</div>`;
+
+            // --- Append the generated content to the correct layout containers ---
+            const isActive = index === 0 ? 'active' : ''; // Make the first tab active
+            
+            // Mobile Tab Button
+            mobileTabsHtml += `<li class="nav-item" role="presentation"><button class="nav-link ${isActive}" id="tab-${qtrKey}" data-bs-toggle="tab" data-bs-target="#pane-${qtrKey}" type="button" role="tab">${qtrKey}</button></li>`;
+            
+            // Mobile Tab Pane (Content)
+            tabContentHtml += `<div class="tab-pane fade show ${isActive}" id="pane-${qtrKey}" role="tabpanel"><div class="metric-card h-100">${quarterContentHtml}</div></div>`;
+
+            // Desktop Grid Column
+            desktopGridHtml += `<div class="col-md-6 col-lg-3 mb-3 d-flex flex-column"><div class="metric-card h-100"><div class="metric-card-header">${qtrKey} ${year}</div>${quarterContentHtml}</div></div>`;
         });
-        contentHtml += '</div>';
-        if (!hasAnyDataForSelectedYearOverall) productHistoryContentEl.innerHTML = `<p class="text-muted text-center mt-3">No products purchased in ${year}.</p>`;
-        else productHistoryContentEl.innerHTML = contentHtml;
+
+        // --- Finalize and Render HTML ---
+        mobileTabsHtml += '</ul>';
+        desktopGridHtml += '</div></div>';
+        tabContentHtml += '</div></div>';
+        
+        if (!hasAnyDataForSelectedYearOverall) {
+            productHistoryContentEl.innerHTML = `<p class="text-muted text-center mt-3">No products purchased in ${year}.</p>`; 
+        } else {
+            productHistoryContentEl.innerHTML = mobileTabsHtml + tabContentHtml + desktopGridHtml;
+        }
+        
         if(productHistoryLoadingEl) showLoading(productHistoryLoadingEl, false);
     }
+
 
     function renderYearlyProductSummaryTable(selectedYear, productsForSelectedYear) {
         if (!yearlyProductSummaryTableBodyEl || !yearlyTotalQuantityCellEl || !yearlyTotalRevenueCellEl || !yearlyTotalsForYearEl || !yearlyProductSummaryTableTotalsRowEl) {
