@@ -145,6 +145,12 @@
             padding-bottom: 3rem !important; /* Applies a large, unmissable bottom padding */
         }
 
+        /* Fix for wrapping trend text alignment */
+        .trend-text-wrapper {
+            padding-left: 1ch;
+            text-indent: -1ch;
+        }
+
         /* --- START OF NEW MOBILE OPTIMIZATION CSS --- */
         /* Target tablets and phones */
         @media (max-width: 991.98px) {
@@ -395,9 +401,9 @@
                         </div>
                         <div class="metric-card-body mt-3 border-top pt-3">
                             <div class="row">
-                                <div class="col-md-6 mb-5 mb-md-0">
+                                <div class="col-md-6 mb-3 mb-md-0">
                                     <span class="metric-label d-block">Yearly Revenue Trend</span>
-                                    <div class="d-flex align-items-baseline flex-wrap">
+                                    <div class="d-flex align-items-baseline flex-wrap trend-text-wrapper">
                                         <span id="revenueTrend" class="metric-value"></span>
                                         <span id="revenueTrendR2" class="metric-value metric-value-small text-muted ms-2"></span>
                                     </div>
