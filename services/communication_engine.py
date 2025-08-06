@@ -789,7 +789,7 @@ if __name__ == "__main__":
     logger.info("--- Standalone Pacing Digest Test Finished ---")
     print("\n--- Standalone Pacing Digest Test Finished ---")
 
-'''
+
 
 if __name__ == "__main__":
     print("--- Running Communication Engine Standalone Test: Send all 4 weekly emails ---")
@@ -918,3 +918,137 @@ if __name__ == "__main__":
         datetime.datetime = original_datetime_class
         logger.info("Restored original datetime.datetime class.")
         print("\n--- All weekly tests complete. ---")
+
+'''
+
+if __name__ == "__main__":
+    # --- This test sends Week 2 digest emails for a specific list of reps to Natasha ---
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        print("--- .env file loaded successfully ---")
+    except ImportError:
+        print("--- WARNING: python-dotenv not installed. Run 'pip install python-dotenv'. ---")
+
+    print("--- Running Communication Engine Standalone Test: Send Week 2 Digest Emails ---")
+
+    # --- Basic Logging Setup ---
+    log_level = logging.INFO 
+    log_formatter = logging.Formatter('%(asctime)s - %(name)s [%(levelname)s] - %(message)s')
+    console_handler = logging.StreamHandler(sys.stdout) 
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(log_formatter)
+    root_logger = logging.getLogger()
+    if not root_logger.hasHandlers(): 
+        root_logger.addHandler(console_handler)
+    root_logger.setLevel(log_level) 
+    logger.setLevel(log_level) 
+    
+    # --- Flask App and DB Setup ---
+    try:
+        from flask import Flask
+        import os 
+        import time
+    except ImportError as e:
+        print(f"ERROR: Required modules not found: {e}.")
+        exit(1)
+
+    app = Flask(__name__)
+    try:
+        db_uri = os.environ.get('SQLALCHEMY_DATABASE_URI')
+        if not db_uri:
+             raise ValueError("SQLALCHEMY_DATABASE_URI not found in environment or .env file.")
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+        logger.info("Database URI loaded successfully.")
+    except Exception as config_err:
+        logger.error(f"Error loading Flask app configuration: {config_err}", exc_info=True)
+        exit(1)
+
+    try:
+        db.init_app(app) 
+        logger.info("Database initialized with Flask app for standalone test.")
+    except Exception as db_err:
+        logger.error(f"Error initializing database with Flask app: {db_err}", exc_info=True)
+        exit(1)
+
+    # --- TEST CONFIGURATION ---
+    TEST_RECIPIENT_EMAIL = "natasha@irwinnaturals.com"
+    REPS_TO_TEST = [
+        "Ashley Bolanos",
+        "Christina Antrim",
+        "Lisa Clarke",
+        "Liz Paz",
+        "Mariano Cruz",
+        "Trina Hilley",
+        "Donald Corgill"
+    ]
+    DAY_TO_SIMULATE_FOR_WEEK_2 = 10 # Any day between 8 and 14
+
+    effective_test_mode = getattr(config, 'TEST_MODE', True)
+    print("\n" + "="*70)
+    print(f"TEST MODE: {'ON (Printing Emails to Console)' if effective_test_mode else 'OFF (Attempting Real SMTP Send)'}")
+    if effective_test_mode:
+        print("!!! IMPORTANT: To send actual emails, ensure TEST_MODE = False in your .env file")
+    print(f"Test emails will be sent to: {TEST_RECIPIENT_EMAIL}")
+    print(f"Generating reports for {len(REPS_TO_TEST)} specific sales reps.")
+    print("="*70 + "\n")
+    
+    with app.app_context():
+        logger.info("App context established for testing.")
+        
+        original_datetime_class = datetime.datetime
+        
+        # --- Mock datetime.datetime.now() to simulate Week 2 ---
+        class MockDateTime(datetime.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                current_real_year = original_datetime_class.now().year
+                current_real_month = original_datetime_class.now().month
+                return original_datetime_class(current_real_year, current_real_month, DAY_TO_SIMULATE_FOR_WEEK_2, tzinfo=tz)
+        
+        datetime.datetime = MockDateTime
+        logger.info(f"MOCKING datetime.now() to: {datetime.datetime.now().date()} to simulate Week 2.")
+
+        # --- Loop through the specified reps and send emails ---
+        for rep_name in REPS_TO_TEST:
+            print(f"\n--- PROCESSING: {rep_name} ---")
+            test_rep_id = None
+            try:
+                stmt = select(AccountPrediction.sales_rep).where(AccountPrediction.sales_rep_name == rep_name).limit(1)
+                result = db.session.execute(stmt).scalar_one_or_none()
+                if result:
+                    test_rep_id = result
+                    logger.info(f"Found Rep ID for {rep_name}: {test_rep_id}")
+                else:
+                    logger.warning(f"Could not find Rep ID for '{rep_name}' in the database. Skipping.")
+                    print(f"⚠️  WARNING: Could not find Rep ID for '{rep_name}'. Skipping this rep.")
+                    continue # Move to the next rep
+            except Exception as e_fetch_rep:
+                logger.error(f"DB error finding Rep ID for {rep_name}: {e_fetch_rep}", exc_info=True)
+                print(f"❌ ERROR: Database error while looking for '{rep_name}'. Skipping.")
+                continue
+
+            try:
+                success = send_weekly_digest_email_for_rep(
+                    test_rep_id, 
+                    rep_name, 
+                    TEST_RECIPIENT_EMAIL  # Always send to Natasha
+                )
+                if success:
+                    print(f"✅ SUCCESS: Week 2 email for {rep_name} was generated and sent/printed.")
+                else:
+                    print(f"❌ FAILED: Week 2 email generation failed for {rep_name}. Check logs for details.")
+            except Exception as e_test_run:
+                logger.error(f"Exception during email generation for {rep_name}: {e_test_run}", exc_info=True)
+                print(f"❌ EXCEPTION on {rep_name}. See logs for details.")
+
+            # Pause between sending emails to be safe
+            if not effective_test_mode:
+                print("Pausing for 3 seconds...")
+                time.sleep(3)
+            
+        # --- Restore the original datetime class ---
+        datetime.datetime = original_datetime_class
+        logger.info("Restored original datetime.datetime class.")
+        print("\n--- All specified reps have been processed. Test finished. ---")
