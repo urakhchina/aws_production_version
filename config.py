@@ -124,23 +124,23 @@ UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', DEFAULT_UPLOAD_FOLDER)
 
 # --- Application Specific Settings ---
 SALES_REP_MAPPING = {
-    "Andy Chasen": "natasha@irwinnaturals.com",
-    "Ashley Bolanos": "natasha@irwinnaturals.com",
-    "Christina Antrim": "natasha@irwinnaturals.com",
-    "Lisa Clarke": "natasha@irwinnaturals.com",
-    "Liz Vasquez": "natasha@irwinnaturals.com",
-    "Mariano Cruz": "natasha@irwinnaturals.com",
-    "Marshall McClean": "natasha@irwinnaturals.com",
-    "Mohit Kumar": "natasha@irwinnaturals.com",
-    "Trina Hilley": "natasha@irwinnaturals.com",
-    "Scott Hendren": "natasha@irwinnaturals.com",
-    "SPROUTS": "natasha@irwinnaturals.com",
-    "Customer Care": "natasha@irwinnaturals.com",
-    "Donald Corgill": "natasha@irwinnaturals.com",
-    "NGVC": "natasha@irwinnaturals.com",
-    "Mid-West Territory": "natasha@irwinnaturals.com",
-    "EARTH FARE": "natasha@irwinnaturals.com",
-    "CLOS": "natasha@irwinnaturals.com"
+    "Andy Chasen": "Andy@irwinnaturals.com",
+    "Ashley Bolanos": "ashleyB@irwinnaturals.com",
+    "Christina Antrim": "christina@irwinnaturals.com",
+    "Lisa Clarke": "Lisa@irwinnaturals.com",
+    "Liz Vasquez": "LizP@irwinnaturals.com",
+    "Mariano Cruz": "mariano@irwinnaturals.com",
+    "Marshall McClean": "marshall@irwinnaturals.com",
+    "Mohit Kumar": "mohit@irwinnaturals.com",
+    "Trina Hilley": "Trina@irwinnaturals.com",
+    "Scott Hendren": "scotth@irwinnaturals.com",
+    "SPROUTS": "marshall@irwinnaturals.com",
+    "Customer Care": "LizP@irwinnaturals.com",
+    "Donald Corgill": "Donald@irwinnaturals.com",
+    "NGVC": "marshall@irwinnaturals.com",
+    "Mid-West Territory": "LizP@irwinnaturals.com",
+    "EARTH FARE": "mariano@irwinnaturals.com",
+    "CLOS": "LizP@irwinnaturals.com"
 }
 
 '''
