@@ -186,6 +186,7 @@ if __name__ == "__main__":
     
     logger.info(f"SCHEDULER_MAIN: Flask app created and setup via factory. Global 'flask_app_instance' is now: {flask_app_instance}")
 
+    '''
     # 4. Perform One-Time Email Sanity Check
     logger.info("SCHEDULER_MAIN: Performing one-time email configuration sanity check...")
     original_test_mode_from_config_module = None # To store the original state of app_config.TEST_MODE
@@ -236,6 +237,7 @@ if __name__ == "__main__":
             app_config.TEST_MODE = original_test_mode_from_config_module
             logger.info(f"SCHEDULER_MAIN (Sanity Check): Restored app_config.TEST_MODE to {original_test_mode_from_config_module}")
     logger.info("SCHEDULER_MAIN: Email sanity check finished.")
+    '''
 
     # 5. Start the Scheduler Thread
     logger.info("SCHEDULER_MAIN: Starting scheduler check thread (target: check_schedule function)...")
