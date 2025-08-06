@@ -1317,11 +1317,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderSkuAnalysis(analysisData, missingProductsData) {
-        if (!rollingSkuAnalysisTableBodyEl || !top30OpportunitiesListEl) {
+        const rollingSkuAnalysisTableBodyEl = rollingSkuAnalysisTableEl ? rollingSkuAnalysisTableEl.querySelector('tbody') : null;
+        const top30OpportunitiesListEl = document.getElementById('top30OpportunitiesList');
+        const top30ActiveListEl = document.getElementById('top30ActiveList'); // New element reference
+    
+        if (!rollingSkuAnalysisTableBodyEl || !top30OpportunitiesListEl || !top30ActiveListEl) {
             console.error("Missing elements for SKU analysis rendering.");
             return;
         }
-
+    
+        // --- Populates the "Purchased SKUs (APL)" table ---
         rollingSkuAnalysisTableBodyEl.innerHTML = '';
         if (analysisData && analysisData.length > 0) {
             const sortedData = [...analysisData].sort((a, b) => {
@@ -1337,36 +1342,36 @@ document.addEventListener('DOMContentLoaded', function () {
                     return rollingSkuSortDirection === 'asc' ? valA - valB : valB - valA;
                 }
             });
-
+    
             sortedData.forEach(sku => {
                 const row = rollingSkuAnalysisTableBodyEl.insertRow();
-
+    
                 const descriptionCell = row.insertCell();
                 let descriptionHtml = sku.description || 'N/A';
                 if (sku.is_top_30 === true) {
                     descriptionHtml += ` <i class="fas fa-star text-warning ms-1" title="Top 30 Product"></i>`;
                 }
                 descriptionCell.innerHTML = descriptionHtml;
-
+    
                 row.insertCell().textContent = sku.item_code || 'N/A';
-
+    
                 const priorRevCell = row.insertCell();
                 priorRevCell.textContent = formatCurrency(sku.prior_12m_rev);
                 priorRevCell.classList.add('text-end');
-
+    
                 const revCell = row.insertCell();
                 revCell.textContent = formatCurrency(sku.current_12m_rev);
                 revCell.classList.add('text-end');
-
+    
                 const yepCell = row.insertCell();
                 yepCell.textContent = sku.sku_yep ? formatCurrency(sku.sku_yep) : 'N/A';
                 yepCell.classList.add('text-end');
-
+    
                 const changeCell = row.insertCell();
                 changeCell.classList.add('text-end');
                 const changePct = sku.yoy_change_pct;
                 const priorRev = sku.prior_12m_rev;
-
+    
                 if (changePct !== null && typeof changePct !== 'undefined') {
                     changeCell.textContent = `${changePct >= 0 ? '+' : ''}${formatValue(changePct, 1)}%`;
                     if (changePct > 0.1) {
@@ -1398,7 +1403,37 @@ document.addEventListener('DOMContentLoaded', function () {
             cell.classList.add('text-center', 'text-muted', 'p-3');
         }
         updateRollingSkuSortIndicators();
-
+    
+        // --- NEW: Populates the "Top 30 (Active)" tab ---
+        top30ActiveListEl.innerHTML = '';
+        const activeTop30Skus = analysisData.filter(sku => sku.is_top_30 === true);
+        if (activeTop30Skus.length > 0) {
+            activeTop30Skus.sort((a,b) => (b.current_12m_rev || 0) - (a.current_12m_rev || 0));
+            activeTop30Skus.forEach(product => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item';
+                const description = product.description || 'N/A';
+                const sku = product.item_code || 'N/A';
+                const revenue = product.current_12m_rev || 0;
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold">${description}</div>
+                            <div class="small text-muted">SKU: ${sku}</div>
+                        </div>
+                        <div class="fw-bold fs-5">${formatCurrency(revenue)}</div>
+                    </div>
+                `;
+                top30ActiveListEl.appendChild(item);
+            });
+        } else {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'list-group-item text-center text-muted p-4';
+            emptyState.innerHTML = `<p class="mb-0"><i class="fas fa-info-circle me-2"></i>No Top 30 products have been purchased in the last 12 months.</p>`;
+            top30ActiveListEl.appendChild(emptyState);
+        }
+    
+        // --- Populates the "Top 30 (Missing)" tab ---
         top30OpportunitiesListEl.innerHTML = '';
         if (missingProductsData && missingProductsData.length > 0) {
             missingProductsData.forEach(product => {

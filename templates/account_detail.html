@@ -510,8 +510,15 @@
                         <div id="rollingAnalysisError" class="alert alert-warning text-center" style="display: none;"></div>
                         <div id="rollingAnalysisContent" style="display: none;">
                             <ul class="nav nav-tabs" id="analysisTab" role="tablist">
-                                <li class="nav-item" role="presentation"><button class="nav-link active" id="apl-tab" data-bs-toggle="tab" data-bs-target="#apl-tab-pane" type="button" role="tab">Purchased SKUs (APL)</button></li>
-                                <li class="nav-item" role="presentation"><button class="nav-link" id="opportunities-tab" data-bs-toggle="tab" data-bs-target="#opportunities-tab-pane" type="button" role="tab">Top 30 Opportunities</button></li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="apl-tab" data-bs-toggle="tab" data-bs-target="#apl-tab-pane" type="button" role="tab">Purchased SKUs (APL)</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="top30-active-tab" data-bs-toggle="tab" data-bs-target="#top30-active-pane" type="button" role="tab">Top 30 (Active)</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="top30-missing-tab" data-bs-toggle="tab" data-bs-target="#top30-missing-pane" type="button" role="tab">Top 30 (Missing)</button>
+                                </li>
                             </ul>
                             <div class="tab-content pt-3" id="analysisTabContent">
                                 <div class="tab-pane fade show active" id="apl-tab-pane" role="tabpanel">
@@ -531,7 +538,12 @@
                                         </table>
                                     </div>
                                 </div>
-                                <div class="tab-pane fade" id="opportunities-tab-pane" role="tabpanel"><div id="top30OpportunitiesList" class="list-group"></div></div>
+                                <div class="tab-pane fade" id="top30-active-pane" role="tabpanel">
+                                    <div id="top30ActiveList" class="list-group"></div>
+                                </div>
+                                <div class="tab-pane fade" id="top30-missing-pane" role="tabpanel">
+                                    <div id="top30OpportunitiesList" class="list-group"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
