@@ -196,6 +196,41 @@
             }
 
         }
+        /* --- START: Column & Sticky Total Row Improvements --- */
+
+        /* 1. Use a fixed table layout for more predictable column behavior */
+        #yearlyProductSummaryTable, #rollingSkuAnalysisTable {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        /* 2. Force long product names to wrap instead of causing horizontal scroll */
+        #yearlyProductSummaryTable td, #yearlyProductSummaryTable th,
+        #rollingSkuAnalysisTable td, #rollingSkuAnalysisTable th {
+            white-space: normal !important; /* Allows text to wrap to the next line */
+            word-wrap: break-word;          /* Breaks even very long words if necessary */
+        }
+
+        /* 3. Make the table header "sticky" so it stays visible during vertical scroll */
+        #yearlyProductSummaryTable thead th,
+        #rollingSkuAnalysisTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            /* A background is crucial to hide the table rows scrolling underneath */
+            background-color: #f8f9fa; 
+            border-bottom: 1px solid #dee2e6; /* Adds a subtle line to separate header from content */
+        }
+
+        /* 4. Make the totals row (footer) "sticky" so it's always visible at the bottom */
+        #yearlyProductSummaryTable tfoot {
+            position: sticky;
+            bottom: -1px; /* Hides the bottom border of the scroll container for a cleaner look */
+            z-index: 1;
+            background-color: #f8f9fa; /* Ensures the background color from the inline style is applied */
+            border-top: 1px solid #dee2e6; /* Adds a line to separate footer from content */
+        }
+        /* --- END: Column & Sticky Total Row Improvements --- */
 
     </style>
 {% endblock %}
@@ -414,7 +449,15 @@
                         <div id="yearlyProductSummaryContentContainer">
                             <div class="table-responsive-custom">
                                 <table class="table table-striped table-hover table-sm" id="yearlyProductSummaryTable">
-                                    <thead></thead><tbody></tbody>
+                                    <thead>
+                                        <tr>
+                                            <th data-column="description">Product Name (Description) <span class="sort-indicator"></span></th>
+                                            <th data-column="sku">SKU <span class="sort-indicator"></span></th>
+                                            <th data-column="total_quantity_year" class="text-end">Total Quantity (Year) <span class="sort-indicator"></span></th>
+                                            <th data-column="total_revenue_year" class="text-end">Total Revenue (Year) <span class="sort-indicator"></span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
                                     <tfoot>
                                         <tr id="yearlyProductSummaryTableTotalsRow" style="font-weight: bold; background-color: #f8f9fa;">
                                             <td colspan="2" class="text-end">Totals for <span id="yearlyTotalsForYear"></span>:</td>
@@ -440,7 +483,21 @@
                             </ul>
                             <div class="tab-content pt-3" id="analysisTabContent">
                                 <div class="tab-pane fade show active" id="apl-tab-pane" role="tabpanel">
-                                    <div class="table-responsive-custom"><table class="table table-striped table-hover table-sm" id="rollingSkuAnalysisTable"><thead></thead><tbody></tbody></table></div>
+                                    <div class="table-responsive-custom">
+                                        <table class="table table-striped table-hover table-sm" id="rollingSkuAnalysisTable">
+                                            <thead>
+                                                <tr>
+                                                    <th data-column="description">Product Name <span class="sort-indicator"></span></th>
+                                                    <th data-column="item_code">SKU <span class="sort-indicator"></span></th>
+                                                    <th class="text-end" data-column="prior_12m_rev">Revenue (Prior 12m) <span class="sort-indicator"></span></th>
+                                                    <th class="text-end" data-column="current_12m_rev">Revenue (Last 12m) <span class="sort-indicator"></span></th>
+                                                    <th class="text-end" data-column="sku_yep">SKU YEP (Current Year) <span class="sort-indicator"></span></th>
+                                                    <th class="text-end" data-column="yoy_change_pct">YoY Change % (Rolling) <span class="sort-indicator"></span></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody></tbody>
+                                        </table>
+                                    </div>
                                 </div>
                                 <div class="tab-pane fade" id="opportunities-tab-pane" role="tabpanel"><div id="top30OpportunitiesList" class="list-group"></div></div>
                             </div>
