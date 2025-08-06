@@ -121,6 +121,11 @@
         #purchaseDetailModalBody { max-height: 60vh; overflow-y: auto; }
         #purchaseDetailModalBody table { width: 100%; font-size: 0.9rem; }
 
+        .card:has(#productHistoryContent) .card-header h6 {
+            font-weight: 600;
+            color: var(--theme-green-dark);
+        }
+
                 /* --- START OF NEW MOBILE OPTIMIZATION CSS --- */
         /* Target tablets and phones */
         @media (max-width: 991.98px) {
@@ -420,7 +425,7 @@
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">Product Purchase History by Quarter</h6>
+                            <h6 class="mb-0 fw-bold">Product Purchase History by Quarter</h6>
                             <div>
                                 <label for="productHistoryYearSelect" class="form-label-sm me-2">Year:</label>
                                 <select id="productHistoryYearSelect" class="form-select form-select-sm d-inline-block" style="width: auto;"></select>
