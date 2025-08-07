@@ -145,6 +145,18 @@ def process_file_async(app_instance_config, filepath):
             }
             cleaned_weekly_df.rename(columns=lambda c: column_rename_map.get(c, c), inplace=True)
 
+            if 'CardName' in cleaned_weekly_df.columns:
+                # Make sure both columns are strings
+                cleaned_weekly_df['CardName'] = cleaned_weekly_df['CardName'].fillna('').astype(str).str.strip()
+                cleaned_weekly_df['name'] = cleaned_weekly_df['name'].fillna('').astype(str).str.strip()
+
+                # Prefer CardName when it is non‑empty; otherwise leave name as is.
+                mask = cleaned_weekly_df['CardName'] != ''
+                cleaned_weekly_df.loc[mask, 'name'] = cleaned_weekly_df.loc[mask, 'CardName']
+
+                # Optionally drop CardName if you don’t need to store it
+                # cleaned_weekly_df.drop(columns=['CardName'], inplace=True)
+
             if 'revenue' not in cleaned_weekly_df.columns:
                 cleaned_weekly_df['revenue'] = pd.to_numeric(cleaned_weekly_df.get('amount'), errors='coerce').fillna(0)
             # --- END FIX ---
@@ -175,10 +187,23 @@ def process_file_async(app_instance_config, filepath):
             transactions_to_insert = cleaned_weekly_df[transaction_cols].replace({pd.NaT: None, np.nan: None}).to_dict(orient='records')
             
             if transactions_to_insert:
+                #stmt = pg_insert(Transaction).values(transactions_to_insert)
+                #stmt = stmt.on_conflict_do_nothing(index_elements=['transaction_hash'])
+                #session.execute(stmt)
+                #logger.info(f"Executed idempotent insert for {len(transactions_to_insert)} transaction records.")
+
                 stmt = pg_insert(Transaction).values(transactions_to_insert)
-                stmt = stmt.on_conflict_do_nothing(index_elements=['transaction_hash'])
+                update_cols = {
+                    'name': stmt.excluded.name,
+                    'distributor': stmt.excluded.distributor,
+                    'sales_rep': stmt.excluded.sales_rep,
+                    # add any other columns you want to refresh
+                }
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=['transaction_hash'],
+                    set_=update_cols
+                )
                 session.execute(stmt)
-                logger.info(f"Executed idempotent insert for {len(transactions_to_insert)} transaction records.")
 
             # --- Stage 3: Aggregate and Update Historical Table ---
             logger.info(f"[Thread:{thread_id}] Aggregating and updating historical revenue...")
