@@ -301,6 +301,7 @@ class Transaction(db.Model):
     quantity = db.Column(db.Integer, nullable=False) # Use Integer if always whole numbers
     revenue = db.Column(db.Float) 
     item_code = db.Column(db.String(50), nullable=True, index=True) # Store ITEM code (SKU)
+    distributor_item_code = db.Column(db.String(50), nullable=True)
     description = db.Column(db.Text) # Product description
     # Add other relevant fields from raw data if needed for analysis (e.g., ITEM code?)
     name = db.Column(db.String(100), nullable=True)
