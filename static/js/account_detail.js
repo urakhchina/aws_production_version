@@ -438,36 +438,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (detailCytdRevenueValuePerfEl) detailCytdRevenueValuePerfEl.textContent = formatCurrency(getattr(pred, 'cytd_revenue', 0.0));
         if (detailYepRevenueValuePerfEl) detailYepRevenueValuePerfEl.textContent = formatCurrency(getattr(pred, 'yep_revenue', 0.0));
 
-        let latestQuarterCoverageValue = null;
-        if (detailedProductHistory && detailedProductHistory[currentYearStr]) {
-            const quarters = ["Q4", "Q3", "Q2", "Q1"];
-            for (const qtr of quarters) {
-                const quarterData = detailedProductHistory[currentYearStr][qtr];
-                if (quarterData && quarterData.metrics &&
-                    (getattr(quarterData.metrics, 'total_items_in_quarter', 0) > 0 || getattr(quarterData.metrics, 'total_revenue_in_quarter', 0) > 0) &&
-                    quarterData.metrics.count_top_30_skus_carried !== undefined
-                   ) {
-                    const carriedInQtr = parseInt(quarterData.metrics.count_top_30_skus_carried) || 0;
-                    const totalTopSkusPossible = 30;
-                    if (totalTopSkusPossible > 0) {
-                        latestQuarterCoverageValue = (carriedInQtr / totalTopSkusPossible) * 100;
-                        break;
-                    }
-                }
-            }
-        }
+        // Use the rolling 12-month coverage from the backend
+        let rolling12MonthCoverageValue = getattr(pred, 'product_coverage_percentage', 0);
 
-        if (latestQuarterCoverageValue === null) {
-            const storedCoverage = getattr(pred, 'product_coverage_percentage', null);
-            if (storedCoverage !== null && !isNaN(parseFloat(storedCoverage))) {
-                latestQuarterCoverageValue = parseFloat(storedCoverage);
-            } else {
-                latestQuarterCoverageValue = 0;
-            }
+        if (ctaTop30CoverageEl) {
+            ctaTop30CoverageEl.textContent = `${formatValue(rolling12MonthCoverageValue, 0)}%`;
         }
 
         if (ctaTop30CoverageEl) {
-            ctaTop30CoverageEl.textContent = `${formatValue(latestQuarterCoverageValue, 0)}%`;
+            ctaTop30CoverageEl.textContent = `${formatValue(rolling12MonthCoverageValue, 0)}%`;
         }
 
         if (btnGenerateMarketingEmailEl) {

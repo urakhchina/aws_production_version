@@ -2,87 +2,104 @@ import json
 import pandas as pd
 import numpy as np
 from scipy import stats
-from datetime import datetime, timedelta, date # Added date
-import time # Keep for potential use
+from datetime import datetime, timedelta, date
+import time
 import math
 import os
 import logging
 import re
-import hashlib # For fallback canonical code
+import hashlib
 from sqlalchemy.orm import Session as SQLAlchemySession
 from dateutil.relativedelta import relativedelta
 import sys
 
-# Import DB and Models (assuming models.py is accessible)
-try:
-    from models import db, AccountPrediction, AccountHistoricalRevenue, Transaction
-except ImportError:
-    # Handle case where models aren't found (e.g., running script standalone without proper path)
-    logging.error("Could not import models. Ensure script runs in project context.")
-    # Define dummies if necessary for script loading, but logic will fail
-    db = None
-    AccountPrediction = None
-    AccountHistoricalRevenue = None
-    Transaction = None # Added Transaction
-
 # Import SQLAlchemy functions needed
 from sqlalchemy import select, func, distinct, and_, desc, extract
 
-# Ensure logger is configured (ideally globally or in app.py)
+# --- Configure Logger ---
 logger = logging.getLogger(__name__)
-# --- Add this block for robust logging during CLI script execution ---
-if not logger.handlers: # Only add a handler if none are configured (avoids duplicate logs)
-    # This ensures that if pipeline.py is imported by a script before Flask fully sets up
-    # its own logging, or if the pipeline logger isn't propagating correctly,
-    # these messages will still go to stdout.
+if not logger.handlers:
     handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - PPLN_DEBUG: %(message)s') # Added PPLN_DEBUG prefix
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - PPLN_DEBUG: %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-logger.setLevel(logging.DEBUG) # Set this logger specifically to DEBUG
+logger.setLevel(logging.DEBUG)
 
+# --- Import DB and Models ---
+try:
+    from models import db, AccountPrediction, AccountHistoricalRevenue, Transaction
+    logger.info("Successfully imported database models.")
+except ImportError as e:
+    logger.error(f"Could not import models. Ensure script runs in project context: {e}")
+    db = None
+    AccountPrediction = None
+    AccountHistoricalRevenue = None
+    Transaction = None
 
-# --- Import Config safely for Scoring Thresholds ---
-# We use getattr for individual constants to provide specific defaults
-# if the config file exists but is missing a specific setting.
+# --- Import Config and Scoring Thresholds ---
 try:
     import config
-    logger.info("Successfully imported config module for scoring thresholds.")
-
+    logger.info("Successfully imported config module.")
+    
+    # Load scoring thresholds
     HEALTH_POOR_THRESHOLD = getattr(config, 'HEALTH_POOR_THRESHOLD', 40)
     PRIORITY_PACE_DECLINE_PCT_THRESHOLD = getattr(config, 'PRIORITY_PACE_DECLINE_PCT_THRESHOLD', -10)
     GROWTH_PACE_INCREASE_PCT_THRESHOLD = getattr(config, 'GROWTH_PACE_INCREASE_PCT_THRESHOLD', 10)
     GROWTH_HEALTH_THRESHOLD = getattr(config, 'GROWTH_HEALTH_THRESHOLD', 60)
     GROWTH_MISSING_PRODUCTS_THRESHOLD = getattr(config, 'GROWTH_MISSING_PRODUCTS_THRESHOLD', 3)
+    
+    # Load TOP_30 product sets
+    TOP_30_SET = getattr(config, 'TOP_30_SET', set())
+    TOP_30_MATCH_SET = getattr(config, 'TOP_30_MATCH_SET', set())
+    
+    # Import the is_top_30_product function if available
+    try:
+        from config import is_top_30_product
+        logger.info(f"Loaded is_top_30_product function from config")
+    except ImportError:
+        # Define fallback function if not in config
+        def is_top_30_product(upc):
+            """Check if a UPC is in the TOP_30 list - handles all formats"""
+            if not upc:
+                return False
+            if pd.isna(upc):
+                return False
+            upc_str = str(upc).strip()
+            return (upc_str in TOP_30_MATCH_SET or 
+                    f"{upc_str}.0" in TOP_30_MATCH_SET or
+                    (upc_str.endswith('.0') and upc_str[:-2] in TOP_30_MATCH_SET))
+        logger.info("Using fallback is_top_30_product function")
+    
+    # Ensure TOP_30_SET is a set of strings
+    if not isinstance(TOP_30_SET, set):
+        logger.warning(f"TOP_30_SET is not a set (type: {type(TOP_30_SET)}). Converting.")
+        TOP_30_SET = set(str(sku) for sku in TOP_30_SET if sku) if TOP_30_SET else set()
+    
+    # Create TOP_30_MATCH_SET if not defined
+    if not TOP_30_MATCH_SET:
+        TOP_30_MATCH_SET = TOP_30_SET | {f"{s}.0" for s in TOP_30_SET}
+    
+    logger.info(f"Loaded config: TOP_30_SET has {len(TOP_30_SET)} items, "
+                f"HEALTH_POOR={HEALTH_POOR_THRESHOLD}, PACE_DECLINE={PRIORITY_PACE_DECLINE_PCT_THRESHOLD}")
 
-    logger.info(f"Loaded scoring thresholds from config: HEALTH_POOR={HEALTH_POOR_THRESHOLD}, PACE_DECLINE={PRIORITY_PACE_DECLINE_PCT_THRESHOLD}, etc.")
-
-except ImportError:
-    logger.warning("Could not import config.py. Using default scoring thresholds.")
-    # Define defaults explicitly if the entire config module import fails
+except ImportError as e:
+    logger.warning(f"Could not import config.py: {e}. Using defaults.")
+    
+    # Define all defaults
     HEALTH_POOR_THRESHOLD = 40
     PRIORITY_PACE_DECLINE_PCT_THRESHOLD = -10
     GROWTH_PACE_INCREASE_PCT_THRESHOLD = 10
     GROWTH_HEALTH_THRESHOLD = 60
     GROWTH_MISSING_PRODUCTS_THRESHOLD = 3
-
-# --- Derive dependent constants (uses the loaded or default value) ---
-PRIORITY_HEALTH_THRESHOLD = HEALTH_POOR_THRESHOLD
-# --- End Scoring Threshold Import --
-
-
-# --- Import Config safely for TOP_30_SET (This will now be SKUs) ---
-try:
-    from config import TOP_30_SET # This is now a set of SKUs
-    if not isinstance(TOP_30_SET, set):
-        logger.warning(f"TOP_30_SET imported from config is not a set (type: {type(TOP_30_SET)}). Converting.")
-        TOP_30_SET = set(str(sku) for sku in TOP_30_SET if sku) if TOP_30_SET else set() # Ensure SKUs are strings
-    logger.info(f"Loaded TOP_30_SET (SKUs) with {len(TOP_30_SET)} items from config.")
-except ImportError:
-    logger.warning("Could not import TOP_30_SET from config. Using empty set.")
     TOP_30_SET = set()
-# --- End TOP_30_SET Import ---
+    TOP_30_MATCH_SET = set()
+    
+    # Define fallback function
+    def is_top_30_product(upc):
+        return False
 
+# Derive dependent constants
+PRIORITY_HEALTH_THRESHOLD = HEALTH_POOR_THRESHOLD
 
 # --- Helper functions for safe type conversion ---
 def safe_float(value, default=0.0):
@@ -242,6 +259,29 @@ def get_base_card_code(card_code):
     base = re.split(r'[_\s-]+', card_code.strip(), 1)[0]
     return base
 
+# Add this helper function near the top of pipeline.py
+def _normalize_upc(upc):
+    """Normalize UPC to a string of pure digits, removing decimals, whitespace, and non-digits."""
+    if pd.isna(upc) or upc is None:
+        return ""
+    try:
+        # Convert to string and handle float inputs
+        upc_str = str(upc)
+        # Remove decimal and anything after it (e.g., "710363579791.0" -> "710363579791")
+        upc_str = upc_str.split('.')[0]
+        # Remove non-digits (e.g., hyphens, spaces)
+        upc_str = re.sub(r'\D', '', upc_str).strip()
+        # Ensure leading zeros are preserved (match TOP_30_SET format, e.g., "0071036358549")
+        if upc_str and upc_str in TOP_30_SET:
+            # If the UPC matches a TOP_30_SET entry, return it as-is to preserve leading zeros
+            for top_sku in TOP_30_SET:
+                if upc_str == top_sku.lstrip('0'):
+                    return top_sku
+        return upc_str if upc_str else ""
+    except Exception as e:
+        logger.warning(f"Error normalizing UPC '{upc}': {e}")
+        return ""
+
 
 def generate_canonical_code(row):
     """
@@ -302,6 +342,9 @@ def calculate_rolling_sku_analysis(canonical_codes: list, session: SQLAlchemySes
     prior_period_end = current_period_start - timedelta(days=1)
     prior_period_start = prior_period_end - timedelta(days=365)
 
+    # Add debug logging
+    logger.debug(f"Rolling SKU Analysis - Time window: {current_period_start} to {current_period_end}")
+
     cy_start = datetime(now.year, 1, 1)
 
     # --- Query to fetch all relevant transactions ---
@@ -319,6 +362,10 @@ def calculate_rolling_sku_analysis(canonical_codes: list, session: SQLAlchemySes
     ).order_by(Transaction.item_code)
     
     results = session.execute(stmt).fetchall()
+
+    # After fetching results, add:
+    logger.debug(f"Found {len(results)} transactions for rolling analysis")
+
     
     if not results:
         logger.warning("No transactions found in the last 24 months for the given accounts.")
@@ -332,6 +379,8 @@ def calculate_rolling_sku_analysis(canonical_codes: list, session: SQLAlchemySes
         'posting_date', 
         'revenue'
     ])
+    #df['item_code'] = df['item_code'].apply(_normalize_upc)
+    df['item_code'] = df['item_code'].astype(str).str.strip()
     df['revenue'] = pd.to_numeric(df['revenue'], errors='coerce').fillna(0.0)
 
     # +++ REVISED FIX: Convert to UTC *during* datetime conversion +++
@@ -410,10 +459,13 @@ def calculate_rolling_sku_analysis(canonical_codes: list, session: SQLAlchemySes
         canonical_code = row['canonical_code']
         # Only include SKUs that had activity in the current 12-month period
         if row['current_12m_rev'] > 0 or row['prior_12m_rev'] > 0:
-            # Get the yoy_change_pct value from the row
-
             yoy_change_val = row['yoy_change_pct']
-            final_yoy_change = round(yoy_change_val, 1) if yoy_change_val is not None else None
+            
+            # FIX: Handle None values properly before rounding
+            if yoy_change_val is not None and not pd.isna(yoy_change_val):
+                final_yoy_change = round(yoy_change_val, 1)
+            else:
+                final_yoy_change = None
             
             sku_to_check = str(row['item_code']).strip()
 
@@ -422,10 +474,9 @@ def calculate_rolling_sku_analysis(canonical_codes: list, session: SQLAlchemySes
                 'description': row['description'] or "N/A",
                 'current_12m_rev': round(row['current_12m_rev'], 2),
                 'sku_yep': round(row['sku_yep'], 2) if row['sku_yep'] > 0 else None,
-                'yoy_change_pct': round(row['yoy_change_pct'], 1),
-                # Add prior_12m_rev for better logic on frontend if needed
+                'yoy_change_pct': final_yoy_change,  # Use the cleaned value
                 'prior_12m_rev': round(row.get('prior_12m_rev', 0.0), 2),
-                'is_top_30': sku_to_check in TOP_30_SET 
+                'is_top_30': is_top_30_product(str(row['item_code']).strip()) 
             })
     
     # Sort each account's list by current 12m revenue
@@ -494,10 +545,8 @@ def calculate_yoy_metrics_from_db(current_year: int, session: SQLAlchemySession)
 
 def calculate_product_coverage_from_db(session: SQLAlchemySession):
     """
-    Calculates product coverage by querying the latest yearly_products_json (which contains SKUs)
-    directly from AccountHistoricalRevenue. TOP_30_SET from config is a set of SKUs.
-    Returns a DataFrame with canonical_code, product_coverage_percentage,
-    carried_top_products_json (SKUs), missing_top_products_json (enhanced with insights).
+    Calculates product coverage by querying the latest yearly_products_json
+    with proper handling of decimal UPCs from the database.
     """
     logger.info("Calculating product coverage (SKU-based) from DB...")
     db_session = session
@@ -505,7 +554,7 @@ def calculate_product_coverage_from_db(session: SQLAlchemySession):
         logger.error("Programming Error: No database session provided to calculate_product_coverage_from_db")
         return pd.DataFrame(columns=['canonical_code', 'product_coverage_percentage', 'carried_top_products_json', 'missing_top_products_json'])
     
-    global TOP_30_SET # This is now a set of SKUs from config
+    global TOP_30_SET, TOP_30_MATCH_SET
     if not TOP_30_SET:
         logger.warning("TOP_30_SET (SKUs) is empty. Cannot calculate product coverage.")
         return pd.DataFrame(columns=['canonical_code', 'product_coverage_percentage', 'carried_top_products_json', 'missing_top_products_json'])
@@ -520,7 +569,7 @@ def calculate_product_coverage_from_db(session: SQLAlchemySession):
 
         latest_year_data_stmt = db.select(
             AccountHistoricalRevenue.canonical_code,
-            AccountHistoricalRevenue.yearly_products_json # This JSON string contains SKUs
+            AccountHistoricalRevenue.yearly_products_json
         ).join(
             latest_year_subq,
             and_(
@@ -545,7 +594,7 @@ def calculate_product_coverage_from_db(session: SQLAlchemySession):
             return pd.DataFrame(columns=['canonical_code', 'product_coverage_percentage', 'carried_top_products_json', 'missing_top_products_json'])
 
         # Build historical SKU lookup for insights
-        historical_sku_lookup = {}  # {canonical_code: {sku: [years_purchased]}}
+        historical_sku_lookup = {}
         for row in all_historical_data:
             canonical_code = row.canonical_code
             year = row.year
@@ -559,79 +608,85 @@ def calculate_product_coverage_from_db(session: SQLAlchemySession):
                     sku_list = json.loads(skus_json)
                     if isinstance(sku_list, list):
                         for sku in sku_list:
-                            sku_str = str(sku) if sku else ""
-                            if sku_str:
-                                if sku_str not in historical_sku_lookup[canonical_code]:
-                                    historical_sku_lookup[canonical_code][sku_str] = []
-                                historical_sku_lookup[canonical_code][sku_str].append(year)
+                            # Normalize the SKU for consistent lookup
+                            sku_normalized = normalize_upc_for_matching(sku)
+                            if sku_normalized:
+                                if sku_normalized not in historical_sku_lookup[canonical_code]:
+                                    historical_sku_lookup[canonical_code][sku_normalized] = []
+                                historical_sku_lookup[canonical_code][sku_normalized].append(year)
                 except Exception as e:
                     logger.warning(f"Could not parse historical SKUs for {canonical_code}, year {year}: {e}")
 
         logger.info(f"Processing SKU coverage for {len(latest_year_data)} accounts based on latest year from DB.")
         coverage_results = []
-        num_top_skus = len(TOP_30_SET)
-
+        
         for row in latest_year_data:
             canonical_code_val = row.canonical_code
             skus_json = row.yearly_products_json
-            account_skus = set()
-
+            
+            # Parse account's SKUs and check against TOP_30
+            carried_products = []
+            missing_products = []
+            
             if skus_json:
                 try:
                     sku_list = json.loads(skus_json)
                     if isinstance(sku_list, list):
-                        # Ensure SKUs from DB are strings for consistent comparison
-                        account_skus = {str(sku) for sku in sku_list if sku} 
+                        # Check each account SKU against TOP_30
+                        for sku in sku_list:
+                            if is_top_30_product(sku):
+                                # Normalize for clean storage
+                                normalized = normalize_upc_for_matching(sku)
+                                if normalized in TOP_30_SET and normalized not in carried_products:
+                                    carried_products.append(normalized)
                 except Exception as e:
-                    logger.warning(f"Could not parse/normalize DB SKUs for {canonical_code_val}: {e}")
-
-            # Compare account's SKUs with the global TOP_30_SET of SKUs
-            carried_skus = account_skus.intersection(TOP_30_SET)
-            missing_skus = TOP_30_SET.difference(account_skus)
+                    logger.warning(f"Could not parse SKUs for {canonical_code_val}: {e}")
             
-            coverage_percent = (len(carried_skus) / num_top_skus) * 100 if num_top_skus > 0 else 0.0
-
-            # Enhanced missing products with insights
+            # Determine missing products
+            carried_set = set(carried_products)
+            missing_products = [sku for sku in TOP_30_SET if sku not in carried_set]
+            
+            # Calculate coverage percentage
+            coverage_percent = (len(carried_products) / len(TOP_30_SET)) * 100 if TOP_30_SET else 0.0
+            
+            # Build insights for missing products
             missing_products_with_insights = []
             account_historical_skus = historical_sku_lookup.get(canonical_code_val, {})
             
-            for missing_sku in missing_skus:
+            for missing_sku in missing_products:
                 if missing_sku in account_historical_skus:
-                    # Previously purchased
                     years_purchased = account_historical_skus[missing_sku]
-                    last_purchased_year = max(years_purchased) if years_purchased else None
-                    years_ago = datetime.now().year - last_purchased_year if last_purchased_year else None
+                    last_year = max(years_purchased) if years_purchased else None
+                    yrs_ago = datetime.now().year - last_year if last_year else None
                     
-                    if years_ago == 1:
+                    if yrs_ago == 1:
                         insight = "Purchased last year but not this year - potential win-back opportunity"
-                    elif years_ago == 2:
+                    elif yrs_ago == 2:
                         insight = "Purchased 2 years ago - consider reintroducing"
-                    elif years_ago and years_ago >= 3:
-                        insight = f"Last purchased {years_ago} years ago - long-term reactivation opportunity"
+                    elif yrs_ago and yrs_ago >= 3:
+                        insight = f"Last purchased {yrs_ago} years ago - long-term reactivation opportunity"
                     else:
                         insight = "Previously purchased - reactivation opportunity"
                     
                     missing_products_with_insights.append({
                         "sku": missing_sku,
-                        "last_purchased_year": last_purchased_year,
+                        "last_purchased_year": last_year,
                         "placeholder_insight": insight
                     })
                 else:
-                    # Never purchased
                     missing_products_with_insights.append({
                         "sku": missing_sku,
                         "last_purchased_year": None,
                         "placeholder_insight": "Never purchased - new product opportunity"
                     })
-
+            
             coverage_results.append({
                 'canonical_code': canonical_code_val,
                 'product_coverage_percentage': round(coverage_percent, 2),
-                # Store the lists of SKUs as JSON strings
-                'carried_top_products_json': safe_json_dumps(sorted(list(carried_skus))),
+                'carried_top_products_json': safe_json_dumps(carried_products),
                 'missing_top_products_json': safe_json_dumps(missing_products_with_insights)
             })
-
+        
         coverage_df = pd.DataFrame(coverage_results)
         logger.info(f"Calculated enhanced SKU-based product coverage from DB for {len(coverage_df)} accounts.")
         return coverage_df
@@ -1718,13 +1773,17 @@ def calculate_correct_revenue(df):
 
 
 # --- Main Recalculation Function (Refactored for SQLAlchemy 2.x & New Metrics) ---
-def recalculate_predictions_and_metrics():
+def recalculate_predictions_and_metrics(session=None):
     """
     Main function to recalculate all account metrics and predictions from the database.
     This version includes fixes for YEP calculation, Growth Engine logic, data handling, 
     last_purchase_date recalculation from actual transaction data, and rolling SKU analysis.
     """
     logger.info("--- Starting recalculation from DB (v10 - YEP/Growth/DataFrame/LastPurchaseDate/RollingSKU Fixes) ---")
+
+    if session is None:
+        session = db.session
+
     start_time = time.time()
     try:
         # === 1. Get All Unique Canonical Codes from Predictions ===
@@ -2007,20 +2066,42 @@ def recalculate_predictions_and_metrics():
                 # +++ Add Rolling SKU Analysis to metric_row +++
                 account_sku_analysis = all_sku_analysis_data.get(code, [])
 
-                # --- NEW SAFETY CHECK for NaN ---
-                # Iterate through the list of dicts and replace any NaN with None
                 clean_sku_analysis = []
                 if account_sku_analysis:
                     for sku_dict in account_sku_analysis:
                         clean_dict = {}
                         for key, value in sku_dict.items():
-                            # math.isnan() checks for NaN, pd.isna() can also work
                             if isinstance(value, float) and math.isnan(value):
                                 clean_dict[key] = None
                             else:
                                 clean_dict[key] = value
                         clean_sku_analysis.append(clean_dict)
                 # --- END NEW SAFETY CHECK ---
+
+                purchased_skus_12m = set()
+                for sku_data in account_sku_analysis:
+                    if sku_data.get('current_12m_rev', 0) > 0:  # Has revenue in last 12 months
+                        item_code = str(sku_data.get('item_code', '')).strip()
+                        if item_code:
+                            purchased_skus_12m.add(item_code)
+
+                # Find which Top 30 SKUs they ARE carrying
+                carried_top30_products = []
+                for sku_data in account_sku_analysis:
+                    if sku_data.get('is_top_30') and sku_data.get('current_12m_rev', 0) > 0:
+                        carried_top30_products.append(str(sku_data.get('item_code', '')))
+
+                coverage_12m = (len(purchased_skus_12m & TOP_30_SET) / len(TOP_30_SET) * 100) if TOP_30_SET else 0
+           
+                # Find which Top 30 SKUs are missing
+                missing_top30_products = []
+                for top30_sku in TOP_30_SET:
+                    if top30_sku not in purchased_skus_12m:
+                        missing_top30_products.append({
+                            "sku": top30_sku,
+                            "description": "Top 30 Product",  # Could enhance with actual descriptions
+                            "reason": "Not purchased in last 12 months"
+                        })
                 
                 metric_row.update({
                     'name': pred_row_current_account.get('name'), 'full_address': pred_row_current_account.get('full_address'),
@@ -2036,9 +2117,12 @@ def recalculate_predictions_and_metrics():
                     'products_purchased': products_purchased_json,
                     'yoy_revenue_growth': yoy_data_for_acc.get('yoy_revenue_growth'),
                     'yoy_purchase_count_growth': yoy_data_for_acc.get('yoy_purchase_count_growth'),
-                    'product_coverage_percentage': cov_data_for_acc.get('product_coverage_percentage'),
-                    'carried_top_products_json': cov_data_for_acc.get('carried_top_products_json'),
-                    'missing_top_products_json': cov_data_for_acc.get('missing_top_products_json'),
+                    #'product_coverage_percentage': cov_data_for_acc.get('product_coverage_percentage'),
+                    'product_coverage_percentage': coverage_12m,
+                    #'carried_top_products_json': cov_data_for_acc.get('carried_top_products_json'),
+                    'carried_top_products_json': json.dumps(carried_top30_products),
+                    #'missing_top_products_json': cov_data_for_acc.get('missing_top_products_json'),
+                    'missing_top_products_json': json.dumps(missing_top30_products),
                     'revenue_trend_slope': trend_results['slope'] if trend_results else None,
                     'revenue_trend_r_squared': trend_results['r_squared'] if trend_results else None,
                     'revenue_trend_intercept': trend_results['intercept'] if trend_results else None,
@@ -2048,7 +2132,7 @@ def recalculate_predictions_and_metrics():
                     'recommended_products_next_purchase_json': recommended_products_next_purchase_json,
                     'growth_engine_message': growth_engine_message,
                     'avg_order_amount_cytd': avg_order_amount_cytd,
-                    'rolling_sku_analysis_json': json.dumps(clean_sku_analysis) if clean_sku_analysis else None
+                    'rolling_sku_analysis_json': json.dumps(clean_sku_analysis) if clean_sku_analysis is not None else None
                 })
 
                 current_batch_processed_metrics.append(metric_row)

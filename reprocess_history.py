@@ -34,6 +34,28 @@ import hashlib
 import math 
 
 from pipeline import calculate_product_coverage_from_db, calculate_yoy_metrics_from_db
+from pipeline import calculate_yearly_revenue_trend
+from pipeline import _normalize_upc
+
+# Helper to format currency for growth engine messages (similar to pipeline.py)
+def _format_currency(value: float | None) -> str:
+    """Format a float value as currency for display. Uses rounding to integer dollars.
+
+    Args:
+        value: Numeric value or None.
+
+    Returns:
+        A string like "$1,234" or "$0" if None or zero.
+    """
+    if value is None:
+        return "$0"
+    try:
+        # Use comma separator for thousands and no decimals
+        # Round to nearest integer for simplicity
+        return f"${value:,.0f}"
+    except Exception:
+        return str(value)
+
 
 # --- Logging Setup ---
 #log_file = f"reprocess_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -47,6 +69,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 # --- Import Models, Config, and Pipeline Functions ---
 # Add project root to path to find modules if running script directly
@@ -57,11 +80,20 @@ if project_root not in sys.path:
 try:
     # Import DB object and models directly for table reflection/metadata
     from models import AccountPrediction, AccountHistoricalRevenue, AccountSnapshot, Transaction
-    import config # Import config for default DB URI
+    try:
+        import config
+        from config import TOP_30_SET, TOP_30_MATCH_SET, is_top_30_product
+        logger.info(f"Loaded TOP_30_SET with {len(TOP_30_SET)} products")
+    except ImportError as e:
+        logger.warning(f"Could not import TOP_30 config: {e}")
+        TOP_30_SET = set()
+        TOP_30_MATCH_SET = set()
+        def is_top_30_product(upc): return False
     # Import necessary functions from pipeline
     from pipeline import ( aggregate_item_codes, safe_json_dumps, transform_days_overdue,
                            calculate_rfm_scores, calculate_health_score,
-                           calculate_enhanced_priority_score, safe_float, safe_int, normalize_address, normalize_store_name, get_base_card_code )
+                           calculate_enhanced_priority_score, safe_float, safe_int, normalize_address, normalize_store_name, get_base_card_code,
+                                    _normalize_upc, calculate_yoy_metrics_from_db, calculate_product_coverage_from_db, calculate_yearly_revenue_trend )
     logger.info("Successfully imported models, config, and pipeline functions.")
 except ImportError as e:
     logger.error(f"Failed to import necessary modules (models, config, pipeline): {e}", exc_info=True)
@@ -258,6 +290,12 @@ def generate_canonical_code(row):
     return None
 
 
+def _fmt2(v):
+    try:
+        return f"{float(v):.2f}"
+    except (TypeError, ValueError):
+        return "null"
+
 # === Data Processing Functions ===
 
 def process_chunk(chunk_df):
@@ -272,7 +310,7 @@ def process_chunk(chunk_df):
     expected_raw_cols = [
         'CardCode', 'ShipTo', 'NAME', 'ADDRESS', 'CITY', 'STATE', 'ZIPCODE',
         'POSTINGDATE', 'AMOUNT', 'QUANTITY', 'DESCRIPTION', 'SalesRep', 'Distributor',
-        'ITEM', 'CUSTOMERID', 'CardName', 'SlpName', 'Manager'
+        'ITEM', 'ITEMUPC', 'CUSTOMERID', 'CardName', 'SlpName', 'Manager'
     ]
     actual_cols = chunk_df.columns.tolist()
 
@@ -311,7 +349,23 @@ def process_chunk(chunk_df):
     chunk_df['SalesRep'] = chunk_df['SalesRep'].fillna('').astype(str)
     chunk_df['SlpName'] = chunk_df['SlpName'].fillna('').astype(str)
     chunk_df['Distributor'] = chunk_df['Distributor'].fillna('').astype(str)
-    chunk_df['ITEM'] = chunk_df['ITEM'].fillna('').astype(str)
+    chunk_df['ITEM'] = chunk_df['ITEM'].fillna('').astype(str).str.strip()
+    # Ensure UPC column exists and is a string; if missing, a blank will be added in expected columns above
+    if 'ITEMUPC' not in chunk_df.columns:
+        logger.warning("[UPC DEBUG] ITEMUPC column missing in this chunk; creating empty.")
+        chunk_df['ITEMUPC'] = ''
+
+    logger.debug(f"[UPC DEBUG] Raw ITEMUPC sample (before normalize): {chunk_df['ITEMUPC'].head().tolist()}")
+    chunk_df['ITEMUPC'] = (
+        chunk_df['ITEMUPC']
+        .fillna('')            # avoid NaN inside the normalizer
+        .astype(str)
+        .str.strip()
+        .apply(_normalize_upc)
+    )
+    logger.debug(f"[UPC DEBUG] Normalized ITEMUPC sample (after normalize): {chunk_df['ITEMUPC'].head().tolist()}")
+
+
     chunk_df['CUSTOMERID'] = chunk_df['CUSTOMERID'].fillna('').astype(str)
 
     # Drop rows with invalid essential data BEFORE normalization/key gen
@@ -350,26 +404,31 @@ def process_chunk(chunk_df):
     # 4. Select and Rename columns needed for downstream tables
     # Define required columns with names matching the MODELS
     output_cols_map = {
-        # Original Raw -> Model/Processing Name
+        # Original Raw -> Final DataFrame column names matching the Transaction model
         'canonical_code': 'canonical_code',
         'base_card_code': 'base_card_code',
-        'ShipTo': 'ship_to_code', # Map raw 'ShipTo' to 'ship_to_code'
+        'ShipTo': 'ship_to_code',
         'year': 'year',
-        'POSTINGDATE': 'posting_date', # Rename for consistency
+        'POSTINGDATE': 'posting_date',
         'AMOUNT': 'amount',
         'QUANTITY': 'quantity',
         'revenue': 'revenue',
         'DESCRIPTION': 'description',
-        'ITEM': 'item_code', # Rename for clarity/model
-        'NAME': 'NAME', # Keep NAME for historical aggregation ('last')
-        'ADDRESS': 'ADDRESS', # Keep for historical aggregation ('last')
-        'CITY': 'CITY', # Keep for historical aggregation ('last')
-        'STATE': 'STATE', # Keep for historical aggregation ('last')
-        'ZIPCODE': 'ZIPCODE', # Keep for historical aggregation ('last')
-        'SalesRep': 'sales_rep', # Rename to match model
-        'SlpName': 'sales_rep_name', # Rename to match model
-        'Distributor': 'distributor', # Rename to match model
-        'CUSTOMERID': 'customer_id' # Rename to match model
+        # UPC column (ITEMUPC) holds the canonical SKU
+        'ITEMUPC': 'item_code',
+        # Store the original distributor item code separately for audit/debugging
+        'ITEM': 'distributor_item_code',
+        # Normalize names and addresses to lowercase column names for consistency with model
+        'NAME': 'name',
+        'ADDRESS': 'address',
+        'CITY': 'city',
+        'STATE': 'state',
+        'ZIPCODE': 'zipcode',
+        # Sales rep and other IDs
+        'SalesRep': 'sales_rep',
+        'SlpName': 'sales_rep_name',
+        'Distributor': 'distributor',
+        'CUSTOMERID': 'customer_id'
     }
 
     # Select and rename columns that actually exist in the chunk
@@ -404,7 +463,8 @@ def aggregate_historical(all_processed_df):
         'total_revenue': ('revenue', 'sum'),
         'transaction_count': ('posting_date', 'count'),
         'yearly_products': ('item_code', aggregate_item_codes),
-        'name': ('NAME', 'last'), # Use last known name in that year
+        # Use lowercase name from processed data
+        'name': ('name', 'last'),
         'sales_rep': ('sales_rep', 'last'), # Use last known rep ID in that year
         'distributor': ('distributor', 'last'), # Use last known distributor in that year
         'base_card_code': ('base_card_code', 'first'), # Should be constant
@@ -455,15 +515,28 @@ def calculate_initial_predictions(all_processed_df, historical_agg_df, engine):
         purchase_datetimes = pd.to_datetime(group['posting_date'].unique()) # Unique timestamps
 
         # --- Basic Info ---
+        # Use lowercase model columns from processed data.
         last_known_row = group.iloc[-1]
-        name = last_known_row['NAME']
-        full_address = f"{last_known_row['ADDRESS']}, {last_known_row['CITY']}, {last_known_row['STATE']} {last_known_row['ZIPCODE']}".strip(', ')
-        sales_rep_id = last_known_row['sales_rep']
-        sales_rep_name = last_known_row['sales_rep_name']
-        distributor = last_known_row['distributor']
-        base_card_code = last_known_row['base_card_code']
-        ship_to_code = last_known_row['ship_to_code']
-        customer_id = last_known_row['customer_id']
+        # Store name: prefer CardName fallback processed earlier.
+        name = (last_known_row.get('name') or '').strip()
+        # Build full address from lowercase columns; gracefully handle missing parts.
+        addr = (last_known_row.get('address') or '').strip()
+        city = (last_known_row.get('city') or '').strip()
+        state = (last_known_row.get('state') or '').strip()
+        zipc = (last_known_row.get('zipcode') or '').strip()
+        # Combine address parts, omitting empties.
+        address_parts = [p for p in [addr, city, state] if p]
+        full_address = ", ".join(address_parts)
+        if zipc:
+            # Append zipcode separated by space if there is an address body, otherwise just set to zipcode.
+            full_address = f"{full_address} {zipc}".strip()
+        # Extract other details using lowercase column names.
+        sales_rep_id = last_known_row.get('sales_rep')
+        sales_rep_name = last_known_row.get('sales_rep_name')
+        distributor = last_known_row.get('distributor')
+        base_card_code = last_known_row.get('base_card_code')
+        ship_to_code = last_known_row.get('ship_to_code')
+        customer_id = last_known_row.get('customer_id')
 
         # --- Last Purchase ---
         last_purchase_datetime = purchase_datetimes[-1] if len(purchase_datetimes) > 0 else None
@@ -474,6 +547,34 @@ def calculate_initial_predictions(all_processed_df, historical_agg_df, engine):
         acc_hist_data = historical_agg_df[historical_agg_df['canonical_code'] == canonical_code]
         account_total = acc_hist_data['total_revenue'].sum()
         purchase_frequency = acc_hist_data['transaction_count'].sum() # Total # of transactions/rows
+
+        # Build yearly series for this account: [{'year': 2019, 'revenue': 12345.67}, ...]
+        yearly_history_list = (
+            acc_hist_data[['year', 'total_revenue']]
+            .dropna(subset=['year'])
+            .sort_values('year')
+            .rename(columns={'total_revenue': 'revenue'})
+            .to_dict(orient='records')
+        )
+
+        # >>> ADD HERE: PY total and trend <<<
+        # Previous-year total revenue (PY)
+        py_total_revenue = float(
+            acc_hist_data.loc[acc_hist_data['year'] == (current_year_num - 1), 'total_revenue'].sum()
+            or 0.0
+        )
+
+        # Trend (slope / intercept / R^2) over yearly revenues
+        # Ensure you have: from pipeline import calculate_yearly_revenue_trend  (at top of file)
+        trend = calculate_yearly_revenue_trend(yearly_history_list)  # dict or None
+        if trend:
+            revenue_trend_slope      = float(trend.get('slope'))        if trend.get('slope')        is not None else None
+            revenue_trend_intercept  = float(trend.get('intercept'))    if trend.get('intercept')    is not None else None
+            revenue_trend_r_squared  = float(trend.get('r_squared'))    if trend.get('r_squared')    is not None else None
+        else:
+            revenue_trend_slope = revenue_trend_intercept = revenue_trend_r_squared = None
+        # <<< END ADD >>>
+        
 
         # --- Interval Calculations ---
         median_interval_days = 30; avg_interval_cytd = None; avg_interval_py = None
@@ -519,36 +620,121 @@ def calculate_initial_predictions(all_processed_df, historical_agg_df, engine):
         avg_order_amount_cytd = cytd_revenue / cytd_count if cytd_count > 0 else None
 
         yep_revenue = None
-        pace_vs_ly = None
-
         # --- FIX: This is the corrected YEP logic for the historical script ---
-        # It correctly uses the account's own last purchase date, not a global one.
         if cytd_revenue > 0 and not cytd_trans.empty:
-            # Use this account's last purchase date for an accurate time window
-            last_cytd_date = cytd_trans['posting_date'].max().date()
+            # Use "now" relative to Jan 1 for the run-rate window
+            days_for_ytd_accumulation = (today_for_calc - pd.Timestamp(datetime(current_year_num, 1, 1)).date()).days + 1
+            # Guard: avoid annualizing on tiny windows (<30 days)
+            if days_for_ytd_accumulation < 30:
+                yep_revenue = cytd_revenue  # no projection yet
+            else:
+                yep_revenue = (cytd_revenue / float(days_for_ytd_accumulation)) * 365.0
 
-            if last_cytd_date >= start_of_current_year.date():
-                # Ensure days calculation is always a positive float
-                days_for_ytd_accumulation = float((last_cytd_date - start_of_current_year.date()).days + 1)
-                
-                if days_for_ytd_accumulation > 0:
-                    yep_revenue = (cytd_revenue / days_for_ytd_accumulation) * 365
-                else:
-                    logger.warning(f"Account {canonical_code} had 0 days for YTD accumulation. YEP not calculated.")
-        # --- END FIX ---
-        
-        py_total_revenue = float(acc_hist_data[acc_hist_data['year'] == (current_year_num - 1)]['total_revenue'].sum())
-        
-        # Calculate pace vs last year using the corrected YEP
-        if yep_revenue is not None:
-            pace_vs_ly = yep_revenue - py_total_revenue
-        
-        # Optional: Add a debug log to see the values during processing
-        logger.debug(
-            f"Reprocess Predictions for {canonical_code}: "
-            f"CYTD={cytd_revenue:.2f}, YEP={yep_revenue:.2f if yep_revenue is not None else 'N/A'}, "
-            f"PY_Revenue={py_total_revenue:.2f}, Pace={pace_vs_ly:.2f if pace_vs_ly is not None else 'N/A'}"
+        # Last year's total revenue (full year)
+        py_total_revenue = float(
+            acc_hist_data.loc[acc_hist_data['year'] == (current_year_num - 1), 'total_revenue'].sum() or 0.0
         )
+
+        # pace_vs_ly as PERCENT (pipeline style)
+        pace_vs_ly = None
+        if yep_revenue is not None and py_total_revenue is not None:
+            if py_total_revenue > 0:
+                pace_vs_ly = ((yep_revenue - py_total_revenue) / py_total_revenue) * 100.0
+            elif yep_revenue > 0:
+                # New Growth: pipeline leaves percent as None and lets UI show "New Growth"
+                pace_vs_ly = None
+            else:
+                pace_vs_ly = 0.0
+
+
+        
+        # Optional: Add a debug log to see the values during processing.
+        # Use safe formatting helper to avoid errors when values are None.
+        logger.debug(
+            "Reprocess Predictions for %s: CYTD=%s YEP=%s PY_Revenue=%s Pace=%s",
+            canonical_code,
+            _fmt2(cytd_revenue),
+            _fmt2(yep_revenue),
+            _fmt2(py_total_revenue),
+            _fmt2(pace_vs_ly)
+        )
+
+        # --- Growth Opportunity Engine ---
+        # Default values for growth engine fields
+        target_yep_plus_1_pct = None
+        additional_revenue_needed_eoy = None
+        suggested_next_purchase_amount = None
+        growth_engine_message = "Data insufficient for growth suggestion."
+
+        # Determine baseline for calculating growth: use previous year's total revenue if available;
+        # otherwise fall back to the projected year‑end pace (YEP). If neither exists, baseline stays 0.
+        baseline_for_target = py_total_revenue if py_total_revenue > 0 else (yep_revenue if yep_revenue and yep_revenue > 0 else 0)
+
+        # Compute growth metrics only if we have a baseline and CYTD revenue
+        if baseline_for_target > 0 and cytd_revenue is not None:
+            # Determine if the account is pacing well versus last year
+            is_pacing_well = pace_vs_ly is not None and pace_vs_ly >= 0
+            # Assign a growth target percentage: +10% if pacing well, +1% otherwise
+            growth_target_pct = 0.10 if is_pacing_well else 0.01
+
+            # Calculate the target total for the year (baseline + growth)
+            target_total_for_calc = baseline_for_target * (1.0 + growth_target_pct)
+            # Additional revenue needed to hit target from current CYTD revenue
+            additional_needed = target_total_for_calc - cytd_revenue
+
+            # Set currency values rounded to 2 decimals
+            target_yep_plus_1_pct = round(target_total_for_calc, 2)
+            additional_revenue_needed_eoy = round(additional_needed, 2)
+
+            if additional_needed <= 0:
+                # Already on track: no additional revenue needed
+                growth_engine_message = (
+                    f"Excellent! On track or has exceeded the +{growth_target_pct*100:.0f}% target (Target: {_format_currency(target_yep_plus_1_pct)})."
+                )
+                suggested_next_purchase_amount = None
+            else:
+                # Need to catch up: compute remaining days and suggested next purchase amount
+                # Days remaining in the current year (use processing_end_datetime as 'today')
+                try:
+                    from datetime import date
+                    dec31 = date(current_year_num, 12, 31)
+                    days_left_in_year = max(1, (dec31 - processing_end_datetime.date()).days)
+                except Exception:
+                    days_left_in_year = max(1, 365 - int(days_elapsed) if 'days_elapsed' in locals() else 1)
+
+                # Estimate number of remaining purchases based on median interval
+                remaining_purchases_est = max(1.0, days_left_in_year / float(median_interval_days) if median_interval_days > 0 else 1.0)
+                # Amount per purchase to meet the target
+                amount_per_purchase = additional_needed / remaining_purchases_est
+                # Suggest at least $50 and not more than the total additional needed
+                suggested_next_purchase_amount = round(additional_revenue_needed_eoy / remaining_purchases_est, 2)
+
+
+                growth_engine_message = (
+                    f"To reach {_format_currency(target_yep_plus_1_pct)} (+{growth_target_pct*100:.0f}% vs baseline), aim for orders around ~{_format_currency(suggested_next_purchase_amount)}."
+                )
+
+        # Compute product recommendations: attempt to suggest missing top products or top revenue SKUs
+        recommended_upcs = []
+        try:
+            top_set = getattr(config, 'TOP_30_SET', set())
+            account_skus = set()
+            if 'item_code' in group.columns:
+                account_skus = {str(x).strip() for x in group['item_code'].dropna().unique() if str(x).strip()}
+            # Prefer recommending missing products from the top set
+            if isinstance(top_set, set) and len(top_set) > 0:
+                missing = [sku for sku in top_set if sku not in account_skus]
+                recommended_upcs = missing[:3]
+            else:
+                # Fallback: pick top revenue SKUs for this account
+                if 'item_code' in group.columns:
+                    revenue_by_sku = group.groupby('item_code')['revenue'].sum().sort_values(ascending=False)
+                    recommended_upcs = [str(code) for code in revenue_by_sku.index.tolist() if str(code).strip()][:3]
+        except Exception as rec_err:
+            logger.warning(f"Could not compute recommended products for {canonical_code}: {rec_err}")
+            recommended_upcs = []
+        # Serialize recommended products as JSON string (list of SKUs)
+        recommended_products_json = json.dumps([str(x) for x in recommended_upcs]) if recommended_upcs else json.dumps([])
 
         # --- Latest Products ---
         latest_hist_row = acc_hist_data.sort_values('year', ascending=False).iloc[0] if not acc_hist_data.empty else None
@@ -569,11 +755,22 @@ def calculate_initial_predictions(all_processed_df, historical_agg_df, engine):
             'cytd_revenue': cytd_revenue, 'yep_revenue': yep_revenue, 'pace_vs_ly': pace_vs_ly,
             'avg_order_amount_cytd': avg_order_amount_cytd,
             'products_purchased': products_purchased_json,
+            'py_total_revenue': py_total_revenue,
+            'revenue_trend_slope': revenue_trend_slope,
+            'revenue_trend_intercept': revenue_trend_intercept,
+            'revenue_trend_r_squared': revenue_trend_r_squared,
             # Placeholders for scores calculated next
             'recency_score': 0, 'frequency_score': 0, 'monetary_score': 0, 'rfm_score': 0.0, 'rfm_segment': '',
             'health_score': 0.0, 'health_category': '', 'priority_score': 0.0, 'enhanced_priority_score': 0.0,
             #'yoy_revenue_growth': 0.0, 'yoy_purchase_count_growth': 0.0, # Calculated later
             #'product_coverage_percentage': 0.0, 'carried_top_products_json': None, 'missing_top_products_json': None # Calculated later
+            # Growth engine output fields
+            'target_yep_plus_1_pct': target_yep_plus_1_pct,
+            'additional_revenue_needed_eoy': additional_revenue_needed_eoy,
+            'suggested_next_purchase_amount': suggested_next_purchase_amount,
+            'recommended_products_next_purchase_json': recommended_products_json,
+            'growth_engine_message': growth_engine_message,
+            'avg_purchase_cycle_days': float(median_interval_days)
         }
         predictions.append(pred_row)
 
@@ -627,88 +824,169 @@ def calculate_initial_predictions(all_processed_df, historical_agg_df, engine):
 
     # --- Calculate Final YoY and Product Coverage ---
     # (Keep logic as corrected before - using temporary session to call helpers)
+ # In your reprocess_history.py, you need to REMOVE the duplicate merge
+# Here's how the code should look:
+
+    # --- Calculate Final YoY and Product Coverage ---
     logger.info("Calculating final YoY and Product Coverage...")
-    engine_for_helpers = create_engine(getattr(config, 'SQLALCHEMY_DATABASE_URI'))
-    #SessionLocal = sessionmaker(bind=engine_for_helpers)
-    SessionLocal = sessionmaker(bind=engine) # Use passed engine
+    
+    # For Product Coverage, calculate directly from historical_agg_df
+    logger.info(f"Calculating product coverage from aggregated data...")
+    logger.info(f"Using TOP_30_SET with {len(config.TOP_30_SET)} products: {list(config.TOP_30_SET)[:3]}...")
+    
+    coverage_df_data = []
+    
+    # Group by canonical_code to get latest year's products for each account
+    for canonical_code in historical_agg_df['canonical_code'].unique():
+        account_hist = historical_agg_df[historical_agg_df['canonical_code'] == canonical_code]
+        
+        # Get the most recent year's data
+        if not account_hist.empty:
+            latest_year_data = account_hist.sort_values('year', ascending=False).iloc[0]
+            
+            carried_products = []
+            products_json = latest_year_data.get('yearly_products_json')
+            
+            if products_json and products_json != '[]':
+                try:
+                    # Parse the JSON
+                    if isinstance(products_json, str):
+                        product_list = json.loads(products_json)
+                    else:
+                        product_list = products_json
+                    
+                    # Check each product against TOP_30_SET
+                    if isinstance(product_list, list):
+                        for product in product_list:
+                            product_str = str(product).strip()
+                            
+                            # Check if it's in TOP_30_SET (which now has .0 versions)
+                            if product_str in config.TOP_30_SET:
+                                carried_products.append(product_str)
+                        
+                        # Remove duplicates
+                        carried_products = list(dict.fromkeys(carried_products))
+                        
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.debug(f"Error parsing products JSON for {canonical_code}: {e}")
+            
+            # Calculate coverage percentage
+            coverage_pct = (len(carried_products) / len(config.TOP_30_SET)) * 100 if config.TOP_30_SET else 0
+            
+            # Find missing products
+            carried_set = set(carried_products)
+            missing_products = [p for p in config.TOP_30_SET if p not in carried_set]
+            
+            # Add to results
+            coverage_df_data.append({
+                'canonical_code': canonical_code,
+                'product_coverage_percentage': round(coverage_pct, 2),
+                'carried_top_products_json': json.dumps(carried_products),
+                'missing_top_products_json': json.dumps(missing_products[:10])  # Limit to save space
+            })
+    
+    # Convert to DataFrame
+    final_coverage = pd.DataFrame(coverage_df_data)
+    
+    # Log statistics
+    if not final_coverage.empty:
+        coverage_stats = final_coverage['product_coverage_percentage']
+        accounts_with_coverage = (coverage_stats > 0).sum()
+        logger.info(f"Product Coverage Results: {accounts_with_coverage}/{len(final_coverage)} accounts have >0% coverage")
+        logger.info(f"Coverage Statistics: Avg={coverage_stats.mean():.2f}%, Max={coverage_stats.max():.2f}%")
+        
+        # Log a few examples
+        top_coverage = final_coverage.nlargest(3, 'product_coverage_percentage')
+        for _, row in top_coverage.iterrows():
+            logger.info(f"  Top coverage example: {row['canonical_code']}: {row['product_coverage_percentage']}% coverage")
+    else:
+        logger.warning("No coverage data calculated!")
+        final_coverage = pd.DataFrame(columns=['canonical_code', 'product_coverage_percentage', 
+                                               'carried_top_products_json', 'missing_top_products_json'])
+    
+    # For YoY metrics, set empty for now (since DB isn't populated yet)
     final_yoy = pd.DataFrame(columns=['canonical_code', 'yoy_revenue_growth', 'yoy_purchase_count_growth'])
-    final_coverage = pd.DataFrame(columns=['canonical_code', 'product_coverage_percentage', 'carried_top_products_json', 'missing_top_products_json'])
-    try:
-        with SessionLocal() as temp_session:
-             final_yoy = calculate_yoy_metrics_from_db(current_year_num, session=temp_session)
-             final_coverage = calculate_product_coverage_from_db(session=temp_session)
-             logger.info(f"YoY DF Shape: {final_yoy.shape if not final_yoy.empty else 'Empty'}")
-             logger.info(f"Coverage DF Shape: {final_coverage.shape if not final_coverage.empty else 'Empty'}")
-             if not final_yoy.empty: logger.info(f"Sample YoY Data:\n{final_yoy.head().to_string()}")
-
-    except Exception as helper_err: 
-        logger.error(f"Error calling final metric helpers: {helper_err}", exc_info=True)
-        final_yoy = pd.DataFrame(columns=['canonical_code', 'yoy_revenue_growth', 'yoy_purchase_count_growth'])
-        final_coverage = pd.DataFrame(columns=['canonical_code', 'product_coverage_percentage', 'carried_top_products_json', 'missing_top_products_json'])
-
-
-    # --- Merge results ---
-    # *** LOGGING POINT 2 ***
-    logger.info(f"Columns in predictions_df BEFORE merges: {predictions_df.columns.tolist()}")
-    if 'yoy_revenue_growth' in predictions_df.columns: logger.warning("YoY columns already exist before merge!")
-
-    if final_yoy is not None and not final_yoy.empty:
-        # Check for column conflicts BEFORE merge
-        common_cols = predictions_df.columns.intersection(final_yoy.columns).tolist()
-        on_col = 'canonical_code'
-        if on_col not in common_cols: logger.error("Merge key 'canonical_code' missing in one of the DFs for YoY!"); raise ValueError("Merge key missing")
-        other_common = [c for c in common_cols if c != on_col]
-        if other_common: logger.warning(f"Potential overlapping columns in YoY merge (excluding key): {other_common}. Using left DF's values.")
-
-        # Perform merge
-        predictions_df = pd.merge(predictions_df, final_yoy, on='canonical_code', how='left') # No suffixes needed if no overlap other than key
-        logger.info("YoY metrics merged.")
-        # *** LOGGING POINT 3 ***
-        if 'yoy_revenue_growth' in predictions_df.columns:
-            check_val = predictions_df.loc[predictions_df['canonical_code'] == '02AK1444_NATURALPANTRY2', 'yoy_revenue_growth']
-            logger.info(f"YoY Growth for 02AK1444 AFTER YOY merge: {check_val.iloc[0] if not check_val.empty else 'Not Found or NaN'}")
-        else: logger.error("YoY columns missing AFTER merge!")
-
-    if final_coverage is not None and not final_coverage.empty:
-        # ... (similar merge logic for coverage) ...
+    
+    # === MERGE SECTION - DO THIS ONLY ONCE ===
+    logger.info(f"Columns in predictions_df BEFORE any merges: {predictions_df.columns.tolist()}")
+    
+    # Merge the coverage data (ONLY ONCE!)
+    if not final_coverage.empty:
+        # Check if we already have coverage columns (shouldn't happen but be safe)
+        if 'product_coverage_percentage' in predictions_df.columns:
+            logger.warning("Coverage columns already exist in predictions_df! Dropping before merge.")
+            predictions_df = predictions_df.drop(columns=['product_coverage_percentage', 
+                                                         'carried_top_products_json', 
+                                                         'missing_top_products_json'], errors='ignore')
+        
         predictions_df = pd.merge(predictions_df, final_coverage, on='canonical_code', how='left')
-        logger.info("Product coverage merged.")
-
-    # --- Log state BEFORE fillna ---
-    logger.info("State of YoY columns BEFORE fillna:")
-    if 'yoy_revenue_growth' in predictions_df.columns:
-        logger.info(f"  YoY Rev Growth Head:\n{predictions_df[['canonical_code', 'yoy_revenue_growth']].head(15).to_string()}")
-        logger.info(f"  YoY Rev Growth NaNs: {predictions_df['yoy_revenue_growth'].isnull().sum()}")
-        logger.info(f"  YoY Rev Growth for 02AK1444: {predictions_df.loc[predictions_df['canonical_code'] == '02AK1444_NATURALPANTRY2', 'yoy_revenue_growth'].iloc[0] if not predictions_df[predictions_df['canonical_code'] == '02AK1444_NATURALPANTRY2'].empty else 'Not Found'}")
-    else: logger.error("yoy_revenue_growth column MISSING before fillna!")
-    if 'yoy_purchase_count_growth' in predictions_df.columns:
-         logger.info(f"  YoY Purch Count Growth NaNs: {predictions_df['yoy_purchase_count_growth'].isnull().sum()}")
-    # --- End Log state BEFORE fillna ---
-
-    # --- More Selective Fill NaNs ---
-    logger.info("Applying final fillna selectively...")
+        logger.info(f"Product coverage merged. Sample coverage values: {predictions_df['product_coverage_percentage'].head()}")
+    
+    
+    # === FILL NaN VALUES SECTION ===
+    # Fill NaN values for all the fields that might be missing
     fill_final = {
-        'yoy_revenue_growth': 0.0, 'yoy_purchase_count_growth': 0.0,
-        'product_coverage_percentage': 0.0, 'carried_top_products_json': json.dumps([]),
+        'yoy_revenue_growth': 0.0,
+        'yoy_purchase_count_growth': 0.0,
+        'product_coverage_percentage': 0.0,
+        'carried_top_products_json': json.dumps([]),
         'missing_top_products_json': json.dumps([])
     }
+    
     for col, default_val in fill_final.items():
-         if col in predictions_df.columns:
-             nan_count_before = predictions_df[col].isnull().sum()
-             if nan_count_before > 0: logger.debug(f"Filling {nan_count_before} NaNs in '{col}' with default")
-             # *** LOGGING POINT 4 ***
-             if col == 'yoy_revenue_growth': logger.debug(f"YoY Growth for 02AK1444 BEFORE fillna: {predictions_df.loc[predictions_df['canonical_code'] == '02AK1444_NATURALPANTRY2', col].iloc[0] if not predictions_df[predictions_df['canonical_code'] == '02AK1444_NATURALPANTRY2'].empty else 'Not Found'}")
-             predictions_df[col] = predictions_df[col].fillna(value=default_val) # Corrected fillna assignment
-             if col == 'yoy_revenue_growth': logger.debug(f"YoY Growth for 02AK1444 AFTER fillna: {predictions_df.loc[predictions_df['canonical_code'] == '02AK1444_NATURALPANTRY2', col].iloc[0] if not predictions_df[predictions_df['canonical_code'] == '02AK1444_NATURALPANTRY2'].empty else 'Not Found'}")
-         else:
-             logger.warning(f"Column '{col}' missing after merge, adding with default.")
-             predictions_df[col] = default_val
-    # --- End Selective Fill NaNs ---
-
-    # Removed redundant merge here (it was duplicated in the original code)
-
+        if col in predictions_df.columns:
+            nan_count_before = predictions_df[col].isnull().sum()
+            if nan_count_before > 0:
+                logger.debug(f"Filling {nan_count_before} NaNs in '{col}' with default")
+            predictions_df[col] = predictions_df[col].fillna(default_val)
+        else:
+            logger.warning(f"Column '{col}' missing after merge, adding with default.")
+            predictions_df[col] = default_val
+    
+    # === FINAL VERIFICATION ===
+    # Check that we have coverage data
+    final_coverage_check = predictions_df['product_coverage_percentage']
+    final_with_coverage = (final_coverage_check > 0).sum()
+    logger.info(f"FINAL CHECK: {final_with_coverage}/{len(predictions_df)} accounts have >0% coverage")
+    logger.info(f"FINAL CHECK: Coverage range: {final_coverage_check.min():.2f}% to {final_coverage_check.max():.2f}%")
+    
     logger.info("Finished all initial prediction calculations.")
     return predictions_df
+
+
+def verify_product_coverage(engine):
+    """
+    Verify product coverage was calculated correctly after reprocessing
+    (Fixed for PostgreSQL's type requirements)
+    """
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT 
+                    COUNT(*) as total_accounts,
+                    COUNT(CASE WHEN product_coverage_percentage > 0 THEN 1 END) as with_coverage,
+                    ROUND(AVG(product_coverage_percentage)::numeric, 2) as avg_coverage,
+                    ROUND(MAX(product_coverage_percentage)::numeric, 2) as max_coverage
+                FROM account_predictions
+            """)).fetchone()
+            
+            logger.info("="*60)
+            logger.info("PRODUCT COVERAGE VERIFICATION:")
+            logger.info(f"  Total accounts: {result.total_accounts}")
+            logger.info(f"  Accounts with coverage: {result.with_coverage} ({result.with_coverage*100/result.total_accounts:.1f}%)")
+            logger.info(f"  Average coverage: {result.avg_coverage}%")
+            logger.info(f"  Max coverage: {result.max_coverage}%")
+            logger.info("="*60)
+            
+            if result.with_coverage == 0:
+                logger.warning("⚠️ WARNING: No accounts have product coverage! Check TOP_30_SET configuration.")
+            elif result.with_coverage < result.total_accounts * 0.3:
+                logger.warning(f"⚠️ WARNING: Only {result.with_coverage*100/result.total_accounts:.1f}% of accounts have coverage. This seems low.")
+            else:
+                logger.info("✅ Product coverage looks healthy!")
+                
+    except Exception as e:
+        logger.error(f"Error verifying product coverage: {e}")
 
 
 def populate_database(engine, historical_df, predictions_df, transaction_df, start_fresh=False):
@@ -785,13 +1063,31 @@ def populate_database(engine, historical_df, predictions_df, transaction_df, sta
         if predictions_df is not None and not predictions_df.empty:
             logger.info(f"--- Inserting {len(predictions_df)} prediction records ---")
             pred_model_cols = [c.name for c in prediction_table.columns if c.name != 'id']
-            prediction_data = predictions_df[pred_model_cols].replace({np.nan: None, pd.NaT: None}).to_dict(orient='records')
+
+            # If you want DB defaults to populate created_at/updated_at, exclude them here:
+            # exclude_for_defaults = {'created_at', 'updated_at'}
+            # pred_model_cols = [c for c in pred_model_cols if c not in exclude_for_defaults]
+
+            # Ensure all reflected columns exist in the DataFrame (create missing as None)
+            missing_pred_cols = [c for c in pred_model_cols if c not in predictions_df.columns]
+            if missing_pred_cols:
+                logger.info(f"Adding missing prediction columns as NULL: {missing_pred_cols}")
+                for c in missing_pred_cols:
+                    predictions_df[c] = None
+
+            # Now safely select columns and insert
+            prediction_data = (
+                predictions_df[pred_model_cols]
+                .replace({np.nan: None, pd.NaT: None})
+                .to_dict(orient='records')
+            )
             with engine.connect() as conn:
                 trans = conn.begin()
                 conn.execute(prediction_table.insert(), prediction_data)
                 trans.commit()
                 total_inserted_pred = len(prediction_data)
             logger.info(f"--- Finished inserting {total_inserted_pred} prediction records ---")
+
         
         logger.info("All data population stages completed successfully.")
         return True
@@ -916,6 +1212,11 @@ def main():
 
         if success:
             end_time = time.time()
+
+            # Add product coverage verification
+            logger.info("Verifying product coverage calculations...")
+            verify_product_coverage(engine)
+
             logger.info(f"--- Reprocessing Complete (Duration: {end_time - start_time:.2f}s) ---")
         else:
             logger.error("Database population failed. Check logs for details.")

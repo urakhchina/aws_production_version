@@ -168,7 +168,7 @@ TOP_30_PRODUCTS = [
     "IN050822", "IN050711", "IN050255", "IN051040", "IN051163", "IN059449", 
     "IN050587", "IN058537", "IN058486", "IN050598", "IN051155", "IN051159"
 ]
-'''
+
 
 TOP_30_SET = {
     "NS1197", "NS1195", "NS1263", "NS1251", "NS1215", "NS1257", "NS1224",
@@ -177,10 +177,99 @@ TOP_30_SET = {
     "NS1159", "NS050967", "NS1254", "NS1243", "NS1207", "NS1168", "NS1107",
     "NS1198", "NS1249"
 }
-
-
+'''
+'''
+TOP_30_SET = {
+"0071036358549.0", "84008141044.0", "710363592059.0", "710363578602.0", "710363585983.0", "710363586386.0",
+"710363594572.0", "840081406076.0", "840081404324.0", "840081405604.0", "840081403297.0", "710363594619.0",
+"0084008141142.0", "710363596767.0", "710363594404.0", "840081407899.0", "840081411384.0", "840081410684.0",
+"840081408223.0", "840081407110.0", "0084008140255.0", "840081410400.0", "840081411636.0", "710363594497.0",
+"0084008140587.0", "710363585372.0", "710363584863.0", "840081405987.0", "84008141155.0", "840081411599.0"
+}
+'''
+'''
+TOP_30_SET = {
+    "0071036358549", "840081410448", "710363592059", "710363578602",
+    "710363585983", "710363586386", "710363594572", "840081406076",
+    "840081404324", "840081405604", "840081403297", "710363594619",
+    "0084008141142", "710363596767", "710363594404", "840081407899",
+    "840081411384", "840081410684", "840081408223", "840081407110",
+    "0084008140255", "840081410400", "840081411636", "710363594497",
+    "0084008140587", "710363585372", "710363584863", "840081405987",
+    "840081411551", "840081411599"
+}
 
 #TOP_30_SET = set(TOP_30_PRODUCTS)
+TOP_30_MATCH_SET = TOP_30_SET | {f"{s}.0" for s in TOP_30_SET}
+'''
+
+TOP_30_CLEAN = {
+    "0071036358549", "840081410448", "710363592059", "710363578602",
+    "710363585983", "710363586386", "710363594572", "840081406076",
+    "840081404324", "840081405604", "840081403297", "710363594619",
+    "0084008141142", "710363596767", "710363594404", "840081407899",
+    "840081411384", "840081410684", "840081408223", "840081407110",
+    "0084008140255", "840081410400", "840081411636", "710363594497",
+    "0084008140587", "710363585372", "710363584863", "840081405987",
+    "840081411551", "840081411599"
+}
+
+# Version with .0 suffix (what's actually in your database)
+TOP_30_WITH_DECIMAL = {f"{s}.0" for s in TOP_30_CLEAN}
+
+# IMPORTANT: Use the decimal version as primary since that's what's in the DB
+TOP_30_SET = TOP_30_WITH_DECIMAL
+
+# Include both for comprehensive matching
+TOP_30_MATCH_SET = TOP_30_CLEAN | TOP_30_WITH_DECIMAL
+
+def normalize_upc_for_matching(upc_str):
+    """Normalize UPC for TOP_30 matching - handles decimal formats"""
+    if not upc_str:
+        return ""
+    
+    # Handle pandas NaN
+    if pd.isna(upc_str):
+        return ""
+    
+    upc_str = str(upc_str).strip()
+    
+    # If it's already in one of our sets, return as-is
+    if upc_str in TOP_30_MATCH_SET:
+        return upc_str
+    
+    # If it doesn't have .0, try adding it
+    if not upc_str.endswith('.0'):
+        with_decimal = f"{upc_str}.0"
+        if with_decimal in TOP_30_MATCH_SET:
+            return with_decimal
+    
+    # If it has .0, try removing it
+    if upc_str.endswith('.0'):
+        without_decimal = upc_str[:-2]
+        if without_decimal in TOP_30_MATCH_SET:
+            return without_decimal
+    
+    return upc_str
+
+def is_top_30_product(upc):
+    """Check if a UPC is in the TOP_30 list - handles all formats"""
+    if not upc:
+        return False
+    
+    # Handle pandas NaN
+    try:
+        if pd.isna(upc):
+            return False
+    except:
+        pass  # If pd isn't imported or upc isn't a pandas type, continue
+    
+    upc_str = str(upc).strip()
+    
+    # Check all possible formats
+    return (upc_str in TOP_30_MATCH_SET or 
+            f"{upc_str}.0" in TOP_30_MATCH_SET or
+            (upc_str.endswith('.0') and upc_str[:-2] in TOP_30_MATCH_SET))
 
 
 # --- Dashboard URL Section (MODIFIED FOR DEBUGGING) ---
